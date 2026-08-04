@@ -1,0 +1,85 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+
+# Built application files
+*.apk
+*.ap_
+*.aab
+
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Generated files
+bin/
+gen/
+out/
+build/
+
+# Gradle files
+.gradle/
+build/
+gradle-appsetting.txt
+!gradle-wrapper.jar
+
+# Local configuration file (sdk path, etc)
+local.properties
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keystore files (⚠️ 重要：不要提交到公开仓库！)
+*.jks
+*.keystore
+
+# Gradle wrapper
+gradle/wrapper/gradle-wrapper.jar
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+
+# Test reports
+**/test-results/**/*.xml
+**/test-results/**/*.html
+
+# Coverage
+coverage/
+.jacoco/
+
+# Proguard
+proguard/
+
+# Firebase
+.firebase/
+firebase-debug.log
+
+# Local env
+.env
+.env.local
+.env.*.local
