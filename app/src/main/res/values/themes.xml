@@ -1,9 +1,23 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Base.Theme.OSMemory" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <item name="colorPrimary">@color/brand_primary</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/brand_secondary</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="colorTertiary">@color/brand_tertiary</item>
+        <item name="android:colorBackground">@color/brand_background</item>
+        <item name="colorSurface">@color/brand_surface</item>
+        <item name="colorOnSurface">@color/brand_on_surface</item>
+        <item name="colorOutline">@color/brand_outline</item>
+        <item name="android:statusBarColor">@color/brand_primary</item>
     </style>
 
     <style name="Theme.OSMemory" parent="Base.Theme.OSMemory" />
+
+    <!-- 靛蓝工具栏上的菜单图标/文字覆盖为白色 -->
+    <style name="ThemeOverlay.Toolbar.OSMemory" parent="ThemeOverlay.Material3.Dark">
+        <item name="colorControlNormal">@color/white</item>
+        <item name="android:textColorPrimary">@color/white</item>
+    </style>
 </resources>

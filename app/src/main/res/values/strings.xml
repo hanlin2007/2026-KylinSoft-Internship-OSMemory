@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">OS Memory</string>
+
+    <string-array name="source_options">
+        <item>控制台</item>
+        <item>记事本应用</item>
+        <item>对话应用</item>
+        <item>文件应用</item>
+    </string-array>
 </resources>

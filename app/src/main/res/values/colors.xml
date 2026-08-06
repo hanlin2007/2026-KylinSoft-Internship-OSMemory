@@ -2,4 +2,40 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- 品牌色：靛蓝主色 + 青绿辅色（记忆 / 智能主题） -->
+    <color name="brand_primary">#3D5AFE</color>
+    <color name="brand_primary_dark">#0031CA</color>
+    <color name="brand_secondary">#00897B</color>
+    <color name="brand_tertiary">#7C4DFF</color>
+    <color name="brand_surface">#FFFFFF</color>
+    <color name="brand_background">#F6F7FB</color>
+    <color name="brand_on_surface">#1B1C22</color>
+    <color name="brand_outline">#E1E3EB</color>
+
+    <!-- 夜间模式 -->
+    <color name="brand_primary_night">#8C9EFF</color>
+    <color name="brand_background_night">#14161F</color>
+    <color name="brand_surface_night">#1E2130</color>
+    <color name="brand_on_surface_night">#E4E6F0</color>
+    <color name="brand_outline_night">#2E3245</color>
+
+    <!-- 语义色：敏感 / 普通 / 公开 / 降级 -->
+    <color name="semantic_sensitive">#C62828</color>
+    <color name="semantic_sensitive_bg">#FDECEA</color>
+    <color name="semantic_normal">#2E7D32</color>
+    <color name="semantic_normal_bg">#E8F5E9</color>
+    <color name="semantic_public">#546E7A</color>
+    <color name="semantic_public_bg">#ECEFF1</color>
+    <color name="semantic_degraded">#E65100</color>
+    <color name="semantic_category">#4527A0</color>
+    <color name="semantic_category_bg">#EDE7F6</color>
+
+    <!-- 日志类型 -->
+    <color name="log_collect">#00695C</color>
+    <color name="log_collect_bg">#E0F2F1</color>
+    <color name="log_retrieve">#283593</color>
+    <color name="log_retrieve_bg">#E8EAF6</color>
+    <color name="log_infer">#E65100</color>
+    <color name="log_infer_bg">#FFF3E0</color>
 </resources>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_memory"
+        android:icon="@drawable/ic_menu_library"
+        android:title="记忆库" />
+    <item
+        android:id="@+id/nav_logs"
+        android:icon="@drawable/ic_menu_logs"
+        android:title="调用日志" />
+</menu>
