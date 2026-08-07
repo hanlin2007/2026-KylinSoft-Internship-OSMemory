@@ -79,7 +79,11 @@ object SampleDataProvider {
                 createdAt = created,
                 updatedAt = created,
                 confidence = s.confidence,
-                evidenceRaw = s.content
+                evidenceRaw = s.content,
+                // 示例记忆默认可上云（cloudEligible=true）+ 待同步（syncState=1），
+                // 装载后点"同步到云端"即可演示 本地→云端 单向拉取
+                cloudEligible = true,
+                syncState = 1
             )
             itemDao.insert(item)
             logDao.insert(

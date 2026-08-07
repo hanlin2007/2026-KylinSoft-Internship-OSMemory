@@ -79,6 +79,21 @@
             android:textColor="?android:attr/textColorSecondary"
             android:textSize="11sp"
             tools:text="来源：console · 应用：osmemory_console · 标签：西湖,跑步" />
+
+        <!-- 阶段 1 修复：extra 字段可视化（降级原因/模型通道/HTTP 状态等），点击条目展开 -->
+        <TextView
+            android:id="@+id/tvLogExtra"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_badge"
+            android:fontFamily="monospace"
+            android:padding="8dp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textIsSelectable="true"
+            android:textSize="11sp"
+            android:visibility="gone"
+            tools:text="{&quot;degraded&quot;: true, &quot;degradeReason&quot;: &quot;HTTP 401：invalid key&quot;}" />
     </LinearLayout>
 
 </com.google.android.material.card.MaterialCardView>

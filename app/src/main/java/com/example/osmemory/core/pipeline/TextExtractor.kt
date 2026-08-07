@@ -102,4 +102,13 @@ object TextExtractor {
         confidence = 0.3,
         sensitivity = false
     )
+
+    /**
+     * 把抽取阶段的任意异常归一化为可读的降级原因（供日志 / 诊断展示）。
+     * CloudModelProvider 已把网络/HTTP/解析异常包装成友好文案，这里兜底。
+     */
+    fun reasonOf(e: Exception): String = when (e) {
+        is IllegalStateException -> e.message ?: "回复中未找到合法 JSON"
+        else -> e.message ?: e.javaClass.simpleName
+    }
 }

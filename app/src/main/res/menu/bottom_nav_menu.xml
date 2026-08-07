@@ -5,6 +5,10 @@
         android:icon="@drawable/ic_menu_library"
         android:title="记忆库" />
     <item
+        android:id="@+id/nav_profile"
+        android:icon="@drawable/ic_menu_profile"
+        android:title="画像" />
+    <item
         android:id="@+id/nav_logs"
         android:icon="@drawable/ic_menu_logs"
         android:title="调用日志" />

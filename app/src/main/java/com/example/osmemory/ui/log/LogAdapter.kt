@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -37,6 +38,9 @@ class LogAdapter : ListAdapter<MemoryLogEntity, LogAdapter.ViewHolder>(DIFF) {
         private val tvTime = itemView.findViewById<TextView>(R.id.tvTime)
         private val tvSummary = itemView.findViewById<TextView>(R.id.tvSummary)
         private val tvLogMeta = itemView.findViewById<TextView>(R.id.tvLogMeta)
+        private val tvLogExtra = itemView.findViewById<TextView>(R.id.tvLogExtra)
+
+        private var expanded = false
 
         fun bind(log: MemoryLogEntity) {
             val context = itemView.context
@@ -57,6 +61,22 @@ class LogAdapter : ListAdapter<MemoryLogEntity, LogAdapter.ViewHolder>(DIFF) {
             tvSummary.text = log.contentSummary
             tvLogMeta.text = "来源：${log.source} · 应用：${log.appId}" +
                 (if (log.tags.isBlank()) "" else " · 标签：${log.tags}")
+
+            // extra 字段可视化：降级原因 / 模型通道 / HTTP 状态 / 重排状态 等
+            val hasExtra = log.extra.isNotBlank() && log.extra != "{}"
+            tvLogExtra.text = if (hasExtra) prettyExtra(log.extra) else null
+            tvLogExtra.isVisible = expanded && hasExtra
+            itemView.setOnClickListener {
+                expanded = !expanded
+                tvLogExtra.isVisible = expanded && hasExtra
+            }
+        }
+
+        /** 尽量美化 extra JSON；解析失败原样展示 */
+        private fun prettyExtra(raw: String): String = try {
+            org.json.JSONObject(raw).toString(2)
+        } catch (_: Exception) {
+            raw
         }
     }
 

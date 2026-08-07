@@ -33,8 +33,24 @@ class HttpModelException(val code: Int, message: String, cause: Throwable? = nul
 /** 通道管理器：当前固定走云端；本地通道可用后自动优先本地 */
 object ModelManager {
 
+    @Volatile
+    private var cached: ModelProvider? = null
+
+    /** 获取当前模型通道（缓存实例；设置页修改配置后调用 [reset] 重建） */
     fun provider(context: android.content.Context): ModelProvider {
+        cached?.let { return it }
+        return synchronized(this) {
+            cached ?: buildProvider(context).also { cached = it }
+        }
+    }
+
+    private fun buildProvider(context: android.content.Context): ModelProvider {
         val local = LocalModelProvider
         return if (local.isAvailable(context)) local else CloudModelProvider(context)
+    }
+
+    /** 设置变更后重建通道（新的 baseUrl/model/apiKey 生效） */
+    fun reset() {
+        cached = null
     }
 }

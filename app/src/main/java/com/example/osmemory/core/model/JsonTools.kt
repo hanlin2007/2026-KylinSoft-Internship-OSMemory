@@ -56,6 +56,40 @@ object JsonTools {
         return null
     }
 
+    /**
+     * 从文本中提取第一个括号平衡的 JSON 数组子串（[a, b, c]）。
+     * 用于模型直接返回裸数组的场景（如语义重排输出 memoId 列表）；找不到返回 null。
+     */
+    fun extractBalancedArray(raw: String): String? {
+        val text = stripFences(raw)
+        val start = text.indexOf('[')
+        if (start < 0) return null
+
+        var depth = 0
+        var inString = false
+        var escaped = false
+        for (i in start until text.length) {
+            val c = text[i]
+            if (inString) {
+                when {
+                    escaped -> escaped = false
+                    c == '\\' -> escaped = true
+                    c == '"' -> inString = false
+                }
+            } else {
+                when (c) {
+                    '"' -> inString = true
+                    '[' -> depth++
+                    ']' -> {
+                        depth--
+                        if (depth == 0) return text.substring(start, i + 1)
+                    }
+                }
+            }
+        }
+        return null
+    }
+
     /** 从 JSON 对象中安全取字符串字段（缺失/类型不符返回默认值） */
     fun optString(json: org.json.JSONObject, key: String, default: String): String =
         if (json.has(key) && !json.isNull(key)) json.optString(key, default) else default

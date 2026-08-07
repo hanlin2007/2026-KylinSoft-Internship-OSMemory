@@ -29,6 +29,9 @@ interface MemoryItemDao {
     @Query("SELECT COUNT(*) FROM memory_items")
     suspend fun count(): Int
 
+    @Query("SELECT * FROM memory_items")
+    suspend fun allItems(): List<MemoryItemEntity>
+
     @Query("DELETE FROM memory_items")
     suspend fun deleteAll()
 
@@ -59,4 +62,37 @@ interface MemoryItemDao {
         """
     )
     suspend fun findByHash(hash: String, source: String, since: Long): MemoryItemEntity?
+
+    // ---------- 云同步（Local → Cloud 单向拉取） ----------
+
+    /**
+     * 可上云的候选记忆：允许同步 且 未同步 且 非敏感（保密隔离：policyLevel=2 永不外发）。
+     * 返回全部（按创建时间倒序），由 TreeSyncManager 逐条推送到云端树。
+     */
+    @Query(
+        """
+        SELECT * FROM memory_items
+        WHERE cloudEligible = 1 AND syncState != 2 AND policyLevel < 2
+        ORDER BY createdAt DESC
+        """
+    )
+    suspend fun cloudSyncCandidates(): List<MemoryItemEntity>
+
+    /** 标记已同步（syncState=2 + 同步时间） */
+    @Query("UPDATE memory_items SET syncState = 2, syncedAt = :ts WHERE id = :id")
+    suspend fun markSynced(id: Long, ts: Long)
+
+    /** 标记待同步（syncState=1，编辑后需要重新推送） */
+    @Query("UPDATE memory_items SET syncState = 1 WHERE id = :id")
+    suspend fun markPending(id: Long)
+
+    /** 标记同步失败（syncState=3） */
+    @Query("UPDATE memory_items SET syncState = 3 WHERE id = :id")
+    suspend fun markSyncFailed(id: Long)
+
+    // ---------- 画像 / 审计 ----------
+
+    /** 按分类取记忆（画像聚合用） */
+    @Query("SELECT * FROM memory_items WHERE category = :category ORDER BY createdAt DESC LIMIT :limit")
+    suspend fun byCategory(category: String, limit: Int = 50): List<MemoryItemEntity>
 }

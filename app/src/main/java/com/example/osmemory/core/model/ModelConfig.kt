@@ -12,12 +12,17 @@ import android.content.Context
  */
 object ModelConfig {
 
-    /** 云端模型通道（OpenAI 兼容 API） */
-    const val DEFAULT_BASE_URL = "https://api.ppio.com/openai"
+    /**
+     * 云端模型通道（OpenAI 兼容 API）。
+     *
+     * ⚠️ 端点修正（2026-08-06）：真实终端为 https://api.ppio.com/openai/v1/chat/completions，
+     * 故 base 必须含 `/v1` 段，否则拼出 `…/openai/chat/completions`（缺 /v1）会返回 404/400 类错误。
+     */
+    const val DEFAULT_BASE_URL = "https://api.ppio.com/openai/v1"
     const val DEFAULT_MODEL = "deepseek/deepseek-v4-flash"
 
-    /** ⚠️ 演示用 Key——提交前请轮换 */
-    private const val DEFAULT_API_KEY = "sk_G-GSsX8Ldz4z5dIahO3faLnvKSR0Pi0C_pIBicyvq0g"
+    /** ⚠️ 演示用 Key（2026-08-06 轮换）——提交前请再轮换 */
+    private const val DEFAULT_API_KEY = "sk_AScVBdkRG_cM8oRsBdf_ktUf_xiN_b-5hZzNj1atnrA"
 
     /** 本地小模型通道（llama.cpp Android 扩展点，阶段 4）——当前不可用 */
     const val LOCAL_CHANNEL_DISABLED_REASON =

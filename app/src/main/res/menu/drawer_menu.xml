@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/action_load_sample"
+        android:icon="@drawable/ic_data"
+        android:title="装载示例数据" />
+    <item
+        android:id="@+id/action_sync_cloud"
+        android:icon="@drawable/ic_menu_library"
+        android:title="同步到云端（单向拉取）" />
+    <item
+        android:id="@+id/action_model_settings"
+        android:icon="@drawable/ic_menu_logs"
+        android:title="模型设置" />
+    <item
+        android:id="@+id/action_audit_export"
+        android:icon="@drawable/ic_data"
+        android:title="审计导出" />
+    <item
+        android:id="@+id/action_clear"
+        android:icon="@drawable/ic_delete"
+        android:title="清空记忆库" />
+</menu>

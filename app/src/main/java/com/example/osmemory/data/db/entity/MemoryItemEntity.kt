@@ -75,5 +75,15 @@ data class MemoryItemEntity(
     val evidenceConfirmed: Boolean = false,
 
     /** 连接 Links：关联记忆/任务/实体的 JSON（阶段 2 图谱使用） */
-    val links: String = "{}"
+    val links: String = "{}",
+
+    /** 云同步（阶段 1 修复 + 双树）：是否允许同步到云端。
+     *  保密隔离：敏感记忆（policyLevel=2）或用户显式勾选"保密不迁移"的记忆置 false，永不离开本地树。 */
+    val cloudEligible: Boolean = true,
+
+    /** 云同步状态：0=仅本地 1=待同步 2=已同步 3=同步失败 */
+    val syncState: Int = 0,
+
+    /** 最近一次成功同步到云端的时间（毫秒，null=从未同步） */
+    val syncedAt: Long? = null
 )

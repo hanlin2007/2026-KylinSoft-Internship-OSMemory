@@ -26,7 +26,7 @@ class JsonToolsTest {
         val raw = "{\"quote\": \"say \\\"{hello}\\\"\"}"
         val json = JsonTools.extractBalancedJson(raw)
         assertEquals("{\"quote\": \"say \\\"{hello}\\\"\"}", json)
-        assertEquals("say \"{hello}\"", JSONObject(json).getString("quote"))
+        assertEquals("say \"{hello}\"", JSONObject(json!!).getString("quote"))
     }
 
     @Test
@@ -42,5 +42,33 @@ class JsonToolsTest {
         assertEquals("x", obj.getString("b"))
         assertEquals(true, obj.getBoolean("c"))
         assertEquals(JSONObject.NULL, obj.get("d"))
+    }
+
+    @Test
+    fun `提取括号平衡的 JSON 数组`() {
+        val raw = """["MEMO-1", "MEMO-2", "MEMO-3"]"""
+        assertEquals("""["MEMO-1", "MEMO-2", "MEMO-3"]""", JsonTools.extractBalancedArray(raw))
+    }
+
+    @Test
+    fun `markdown 围栏包裹的数组可提取`() {
+        val raw = "```json\n[\"a\", \"b\"]\n```"
+        assertEquals("[\"a\", \"b\"]", JsonTools.extractBalancedArray(raw))
+    }
+
+    @Test
+    fun `字符串内包含括号不影响数组扫描`() {
+        val raw = """["a]{b", "c]d", "e"]"""
+        assertEquals("""["a]{b", "c]d", "e"]""", JsonTools.extractBalancedArray(raw))
+    }
+
+    @Test
+    fun `对象内嵌数组按数组提取`() {
+        assertEquals("[1,2]", JsonTools.extractBalancedArray("{\"ids\": [1,2]}"))
+    }
+
+    @Test
+    fun `完全无数组返回 null`() {
+        assertEquals(null, JsonTools.extractBalancedArray("完全没有数组"))
     }
 }

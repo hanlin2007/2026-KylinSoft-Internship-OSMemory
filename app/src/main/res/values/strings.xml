@@ -1,6 +1,9 @@
 <resources>
     <string name="app_name">OS Memory</string>
 
+    <string name="open_drawer">打开操作抽屉</string>
+    <string name="close_drawer">关闭操作抽屉</string>
+
     <string-array name="source_options">
         <item>控制台</item>
         <item>记事本应用</item>

@@ -1,10 +1,10 @@
 # OS Memory 开发计划（4 阶段并行交付版）
 
-> 分支：`feature/osmemory-full`（本分支完成全部工作，由本人手动 commit）
+> 分支：`api-key-warning`（阶段 1 修复 + 阶段 2 在本分支完成，由本人手动 commit）
 > 权威参考：`OS_Memory_初步调研与系统设计_修改版.pptx`（一切设计以 PPT 为最终标准）
 > 工程基线：Android 原生应用形态（Kotlin + XML View，无 Compose），单 `:app` 模块
 > 技术决策（2026-08-05 确认）：Room 数据库 · 云端大模型替代端侧小模型（双通道，杜绝规则引擎）· 精致控制台 + 示例数据一键装载
-> 模型配置：BaseURL `https://api.ppio.com/openai` · Model `deepseek/deepseek-v4-flash` · API Key 见 `core/ModelConfig.kt`（演示用，提交前建议轮换）
+> 模型配置：BaseURL `https://api.ppio.com/openai/v1`（⚠️ 必须含 `/v1`，真实终端 `https://api.ppio.com/openai/v1/chat/completions`）· Model `deepseek/deepseek-v4-flash` · API Key 见 `core/ModelConfig.kt`（2026-08-06 轮换，演示用，提交前建议再轮换）
 
 ---
 
@@ -66,9 +66,30 @@
 
 ---
 
+---
+
+## 阶段 1 修复清单（2026-08-06 评审后，分支 `api-key-warning`）
+
+评审发现的问题与修复：
+
+| # | 问题 | 修复 |
+|---|---|---|
+| F1 | 顶部工具栏（两个 always 菜单项）在 Pixel 9 上超高、垃圾桶/工具栏无法点击 | 工具栏仅保留标题 + 汉堡；装载示例/清空/同步云端/模型设置/审计导出 全部移入**左侧导航抽屉**（DrawerLayout + NavigationView），修复后所有操作可点击 |
+| F2 | 核心逻辑无 AI 参与，静默降级为硬编码引擎；日志 EXTRA 被隐藏，无法定位降级原因 | ① 修正模型端点（`BaseURL` 含 `/v1`）并轮换新 API Key；② 每次模型调用写入 `ModelDiagnostics`（成功/失败 + 精确原因：网络异常/HTTP 状态码/解析失败/超时）；③ 流水线捕获 `degradeReason` 写入 COLLECT + INFER 日志；④ 日志条目**点击展开显示 extra JSON**；⑤ 记忆库/抽屉头部实时展示"模型通道 + 最近调用结果" |
+| F3 | 无联网/断网两种状态的路由反馈 | 新增 `NetworkMonitor`（ConnectivityManager → StateFlow）——在线/离线即时反馈到：记忆库顶部状态徽标、抽屉头部、云端树可达性；断网时云端树显示"不可达" |
+| F4 | 需要 Local Tree / Cloud Tree 双库 + 云端内网树隔离（云端可拉取本地，本地不能 pull 云端） | 独立云端库 `osmemory_cloud.db`（模拟云端企业/个人库）；`TreeSyncManager` 作为 Network Gateway 做**单向**本地→云端拉取；敏感/保密记忆（policyLevel=2 或勾选保密）永不外发；本地树从云端读回被架构禁止；记忆库页双树 Tab 切换 + 每卡同步状态徽标（仅本地/待同步/已同步/同步失败/敏感不迁移/云端） |
+
+## 阶段 2 详细清单（2026-08-07 本轮交付）
+
+- **记忆画像三板块**（`ui/profile/ProfileFragment` + `core/profile/ProfileBuilder`）：用户画像 / 风格偏好 / 工作项目 + 遴选标签；LLM 从本地树聚合生成，离线/失败统计降级（最高频标签），降级原因显示并留 INFER + RETRIEVE 日志
+- **语义检索**（`core/retrieval/SemanticReranker`）：`get_memo` 关键词召回 + LLM 语义重排，记忆库顶部搜索框落地；重排状态（ai/降级+原因）写入 RETRIEVE 日志
+- **记忆修改流程**（`MemoryPipeline.update`）：先画像后改——点击卡片查看该记忆画像上下文（分类/标签/敏感级/置信度/时间），再编辑；保留 memoId/createdAt，重跑抽取，可勾选"保密不迁移云端"；留 COLLECT(update) + INFER 日志
+- **模型设置页**（`ui/settings/ModelSettingsFragment`）：改 BaseURL/Model/API Key，测试连接（成功/失败+原因直显），保存即热插拔通道（`ModelManager.reset()`）
+- **审计导出**（`data/AuditExporter`）：本地树 + 云端树 + 全部日志序列化为 JSON 审计快照，经系统文档创建器（SAF）导出
+
 ## 版本状态记录
 
-- [x] **阶段 1 最小系统** — 2026-08-05 完成（分支 `feature/osmemory-full`，未提交，等待手动 commit）
-- [ ] **阶段 2 控制台完整版 + 检索/画像**
+- [x] **阶段 1 最小系统** — 2026-08-05 完成
+- [x] **阶段 1 评审修复 + 阶段 2 控制台完整版/检索/画像** — 2026-08-07 完成（分支 `api-key-warning`，未提交，等待手动 commit）
 - [ ] **阶段 3 vibe 三应用 + 系统 API 封装**
 - [ ] **阶段 4 进阶整合 + 演示打磨**

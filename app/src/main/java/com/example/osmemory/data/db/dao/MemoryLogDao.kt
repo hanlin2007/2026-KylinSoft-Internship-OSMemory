@@ -19,6 +19,10 @@ interface MemoryLogDao {
     @Query("SELECT * FROM memory_logs ORDER BY timestamp DESC LIMIT :limit")
     fun observeAll(limit: Int = 500): Flow<List<MemoryLogEntity>>
 
+    /** 全量日志（审计导出用，不做上限截断） */
+    @Query("SELECT * FROM memory_logs ORDER BY timestamp DESC")
+    suspend fun observeAllNow(): List<MemoryLogEntity>
+
     @Query("DELETE FROM memory_logs")
     suspend fun deleteAll()
 }
