@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="p3_notes_app_name">记事本 · OS Memory</string>
+    <string name="p3_chat_app_name">记忆问答 · OS Memory</string>
+    <string name="p3_chat_settings_name">记忆问答设置</string>
+    <string name="p3_classifier_app_name">记忆文件分类 · OS Memory</string>
+</resources>

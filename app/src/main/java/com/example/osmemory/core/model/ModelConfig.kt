@@ -6,9 +6,7 @@ import android.content.Context
  * 模型通道配置（阶段 1 默认：云端大模型替代端侧小模型）
  *
  * BaseURL / Model / API Key 三项均可被 SharedPreferences 覆盖（阶段 2 提供设置页）。
- *
- * ⚠️ 安全提示：下方 Key 为演示用途。正式提交/对外分享前请在设置页或此处轮换，
- * 更推荐的方式是移出代码（local.properties / 构建时注入）。
+ * API Key 默认留空，由设置页或本机构建配置注入，禁止进入源码与 Git 历史。
  */
 object ModelConfig {
 
@@ -21,8 +19,8 @@ object ModelConfig {
     const val DEFAULT_BASE_URL = "https://api.ppio.com/openai/v1"
     const val DEFAULT_MODEL = "deepseek/deepseek-v4-flash"
 
-    /** ⚠️ 演示用 Key（2026-08-06 轮换）——提交前请再轮换 */
-    private const val DEFAULT_API_KEY = "sk_AScVBdkRG_cM8oRsBdf_ktUf_xiN_b-5hZzNj1atnrA"
+    /** 安全默认值：未配置时由模型网关返回明确鉴权失败，不在源码中携带凭据。 */
+    private const val DEFAULT_API_KEY = ""
 
     /** 本地小模型通道（llama.cpp Android 扩展点，阶段 4）——当前不可用 */
     const val LOCAL_CHANNEL_DISABLED_REASON =

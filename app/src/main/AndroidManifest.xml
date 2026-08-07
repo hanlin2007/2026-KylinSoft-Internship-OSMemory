@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
+        android:name=".phase3.api.Phase3Application"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -15,6 +16,44 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.OSMemory">
+        <!--
+          阶段三保持单 APK / 同进程 MemoryService，三个独立 Launcher Activity
+          作为 vibe 应用入口；跨进程 Binder/AIDL 传输层留到阶段四。
+        -->
+        <activity
+            android:name=".phase3.classifier.ClassifierActivity"
+            android:exported="true"
+            android:label="@string/p3_classifier_app_name"
+            android:taskAffinity="com.example.osmemory.classifier">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".phase3.chat.ChatSettingsActivity"
+            android:exported="false"
+            android:label="@string/p3_chat_settings_name" />
+        <activity
+            android:name=".phase3.chat.ChatActivity"
+            android:exported="true"
+            android:label="@string/p3_chat_app_name"
+            android:taskAffinity="com.example.osmemory.chat">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".phase3.notes.NotesActivity"
+            android:exported="true"
+            android:label="@string/p3_notes_app_name"
+            android:taskAffinity="com.example.osmemory.notes">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
         <activity
             android:name=".MainActivity"
             android:exported="true"
