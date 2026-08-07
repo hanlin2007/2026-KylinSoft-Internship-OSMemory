@@ -51,7 +51,7 @@ suspend fun autoRecommend(scene: String, limit: Int = 60): List<MemoryMemo>
 ### 3.1 记事本
 
 - 只有无标题文本记录，使用应用私有 SharedPreferences/JSON 保存，不改 OS Memory 数据库结构。
-- 支持新建、编辑、保存、删除。
+- 主页面只展示记录列表；新建或点击记录后进入独立编辑页，支持保存、删除。
 - 新记录保存后询问“是否关联到记忆”；确认后立即调用 `memoCollect`，无额外同步按钮。
 - 已关联记录再次保存时可同步调用 `memoUpdate`。
 - 删除已关联记录时明确让用户选择“只删记录”或“同时删除关联记忆”，不静默级联。

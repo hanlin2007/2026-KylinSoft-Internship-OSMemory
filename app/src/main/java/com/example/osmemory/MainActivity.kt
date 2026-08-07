@@ -1,6 +1,7 @@
 package com.example.osmemory
 
 import android.os.Bundle
+import android.view.View
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -29,7 +30,7 @@ import kotlinx.coroutines.withContext
  *
  * - 顶部工具栏只保留标题 + 汉堡，操作全部收进左侧抽屉（修复 Pixel 9 工具栏超高无法点击）
  * - 抽屉操作：装载示例数据 / 同步到云端（单向拉取）/ 模型设置 / 审计导出 / 清空记忆库
- * - 底部导航三页：记忆库（双树）/ 画像（三板块）/ 调用日志（三板块）
+ * - 底部导航三页：记忆库（双树）/ 画像（三板块）/ 调用日志（四板块）
  */
 class MainActivity : AppCompatActivity() {
 
@@ -37,8 +38,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var navHeaderNetwork: TextView
     private lateinit var navHeaderModel: TextView
 
+    /** 可视化导出（阶段 2 修复）：HTML 快照，Pixel 浏览器可直接打开查看 */
     private val exportLauncher =
-        registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        registerForActivityResult(ActivityResultContracts.CreateDocument("text/html")) { uri ->
             if (uri != null) writeAudit(uri)
         }
 
@@ -61,6 +63,8 @@ class MainActivity : AppCompatActivity() {
         val header = navDrawer.getHeaderView(0)
         navHeaderNetwork = header.findViewById(R.id.navHeaderNetwork)
         navHeaderModel = header.findViewById(R.id.navHeaderModel)
+        // 阶段 2 修复：侧栏头部整体下移一个状态栏高度，避免与系统状态栏文字重叠
+        fixNavHeaderStatusBarInset(header)
         observeStatus()
 
         navDrawer.setNavigationItemSelectedListener { menuItem ->
@@ -110,13 +114,50 @@ class MainActivity : AppCompatActivity() {
             .commit()
     }
 
-    /** 抽屉头部实时展示：联网状态 + 模型通道 + 上次模型调用 */
+    /**
+     * 抽屉头部与系统状态栏重叠修复：把头部内容整体下移一个状态栏高度。
+     * （header 背景会延伸到状态栏区域，文本随之让出，保证可读、可点击。）
+     */
+    private fun fixNavHeaderStatusBarInset(header: View) {
+        val statusBarHeight = statusBarHeightPx()
+        if (statusBarHeight <= 0) return
+        header.setPadding(
+            header.paddingLeft,
+            header.paddingTop + statusBarHeight,
+            header.paddingRight,
+            header.paddingBottom
+        )
+    }
+
+    /** 读取系统状态栏高度（像素）；不可用时返回 0 */
+    private fun statusBarHeightPx(): Int {
+        val resId = resources.getIdentifier("status_bar_height", "dimen", "android")
+        return if (resId > 0) resources.getDimensionPixelSize(resId) else 0
+    }
+
+    /** 抽屉头部实时展示：联网状态 + 模型通道 + 上次模型调用；联网（内网）时自动触发云端树整合拉取 */
     private fun observeStatus() {
         val repo = MemoryService.repo(this)
+        var lastOnline: Boolean? = null
         lifecycleScope.launch {
             repo.observeNetwork().collect { online ->
-                navHeaderNetwork.text = if (online) "● 在线（Cloud Tree 可达）" else "● 离线（Cloud Tree 不可达）"
+                navHeaderNetwork.text = if (online) "● 在线（内网 · Cloud Tree 可达）" else "● 离线（Cloud Tree 不可达）"
                 navHeaderNetwork.setTextColor(if (online) 0xFFB9F6CA.toInt() else 0xFFFFCDD2.toInt())
+                // 每次 离线 → 在线 网络切换：自动拉取本地待同步记忆到云端树（敏感/保密记忆隔离）
+                val was = lastOnline
+                lastOnline = online
+                if (online && was == false) {
+                    lifecycleScope.launch {
+                        val report = withContext(Dispatchers.IO) { repo.ensureCloudIntegrated() }
+                        if (report != null) {
+                            Toast.makeText(
+                                this@MainActivity,
+                                report.message,
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                }
             }
         }
         lifecycleScope.launch {
@@ -156,22 +197,24 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startAuditExport() {
-        exportLauncher.launch("osmemory_audit_${System.currentTimeMillis()}.json")
+        exportLauncher.launch("osmemory_audit_${System.currentTimeMillis()}.html")
     }
 
     private fun writeAudit(uri: android.net.Uri) {
         lifecycleScope.launch {
-            val json = withContext(Dispatchers.IO) { MemoryService.repo(this@MainActivity).exportAuditJson() }
+            // 可视化 HTML 快照（含原始 JSON 折叠块），Pixel 浏览器直接打开查看
+            val html = withContext(Dispatchers.IO) { MemoryService.repo(this@MainActivity).exportAuditHtml() }
             val ok = withContext(Dispatchers.IO) {
                 try {
-                    contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray()) } != null
+                    contentResolver.openOutputStream(uri)?.use { it.write(html.toByteArray()) } != null
                 } catch (e: Exception) {
                     false
                 }
             }
             Toast.makeText(
                 this@MainActivity,
-                if (ok) "审计快照已导出（本地树+云端树+全部日志）" else "导出失败：无法写入目标文件",
+                if (ok) "可视化审计快照已导出（本地树+云端树+全部日志），用浏览器打开即可查看"
+                else "导出失败：无法写入目标文件",
                 Toast.LENGTH_SHORT
             ).show()
         }

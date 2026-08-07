@@ -19,8 +19,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * 模型设置页（阶段 2）：修改 Base URL / Model / API Key，测试连接，保存即热插拔。
+ * 模型设置页（阶段 2 + 阶段 2 修复）：修改 Base URL / 云端模型 / 本地模型 / API Key，测试连接，保存即热插拔。
  *
+ * 网关语义：云端大模型（联网/内网 = 云端状态）+ 本地小模型（离线/本地网关）双插拔接口，
+ * 两者共享 BaseURL 与端点，仅 Model ID 不同。
  * 降级可观测：测试结果直接展示"成功/失败 + 具体原因"（网络/HTTP/解析），
  * 保存后 ModelManager.reset() 重建通道，业务代码零改动。
  */
@@ -38,18 +40,20 @@ class ModelSettingsFragment : Fragment() {
 
         val etBaseUrl = view.findViewById<EditText>(R.id.etBaseUrl)
         val etModel = view.findViewById<EditText>(R.id.etModel)
+        val etLocalModel = view.findViewById<EditText>(R.id.etLocalModel)
         val etApiKey = view.findViewById<EditText>(R.id.etApiKey)
 
         // 回填当前配置
         etBaseUrl.setText(ModelConfig.baseUrl(context))
         etModel.setText(ModelConfig.model(context))
+        etLocalModel.setText(ModelConfig.localModel(context))
         etApiKey.setText(ModelConfig.apiKey(context))
 
         view.findViewById<TextView>(R.id.btnTest).setOnClickListener {
             testConnection(etBaseUrl, etModel, etApiKey, view)
         }
         view.findViewById<TextView>(R.id.btnSave).setOnClickListener {
-            save(etBaseUrl, etModel, etApiKey, view)
+            save(etBaseUrl, etModel, etLocalModel, etApiKey, view)
         }
     }
 
@@ -90,16 +94,24 @@ class ModelSettingsFragment : Fragment() {
         }
     }
 
-    private fun save(etBaseUrl: EditText, etModel: EditText, etApiKey: EditText, root: View) {
+    private fun save(
+        etBaseUrl: EditText, etModel: EditText, etLocalModel: EditText, etApiKey: EditText, root: View
+    ) {
         val baseUrl = etBaseUrl.text?.toString()?.trim().orEmpty()
         val model = etModel.text?.toString()?.trim().orEmpty()
+        val localModel = etLocalModel.text?.toString()?.trim().orEmpty()
         val apiKey = etApiKey.text?.toString()?.trim().orEmpty()
         if (baseUrl.isEmpty() || model.isEmpty() || apiKey.isEmpty()) {
             toast("Base URL / 模型 / API Key 不能为空")
             return
         }
-        MemoryService.repo(requireContext()).saveModelConfig(baseUrl, model, apiKey)
-        toast("已保存并热插拔模型通道：$model")
+        MemoryService.repo(requireContext()).saveModelConfig(
+            baseUrl = baseUrl,
+            model = model,
+            apiKey = apiKey,
+            localModel = localModel
+        )
+        toast("已保存并热插拔模型通道：云端 $model · 本地 $localModel")
     }
 
     private fun toast(msg: String) {

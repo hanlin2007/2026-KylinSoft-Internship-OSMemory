@@ -1,10 +1,15 @@
 package com.example.osmemory.core.model
 
+import com.example.osmemory.core.net.NetworkMonitor
+
 /**
- * 模型通道统一契约（双通道设计，杜绝规则引擎替代 AI 能力）
+ * 模型通道统一契约（双插拔接口设计，杜绝规则引擎替代 AI 能力）
  *
- * 业务层只依赖本接口：云端通道（阶段 1 默认）与本地小模型通道（阶段 4 扩展点）
- * 实现可热插拔，业务代码零改动。
+ * 两个可插拔模型接口（对齐产品"网关分离"设计）：
+ *  - [CloudModelProvider]：云端大模型（联网/政企内网 = "云端状态"时使用，算力更强）
+ *  - [LocalModelProvider]：手机端部署的本地小模型（离线/本地网关使用，共享 BaseURL/端点，仅 Model ID 不同）
+ *
+ * 业务层只依赖本接口；[ModelManager] 按网络状态路由通道，接入本地小模型后业务代码零改动。
  */
 interface ModelProvider {
 
@@ -30,27 +35,47 @@ open class ModelException(message: String, cause: Throwable? = null) : Exception
 class HttpModelException(val code: Int, message: String, cause: Throwable? = null) :
     ModelException(message, cause)
 
-/** 通道管理器：当前固定走云端；本地通道可用后自动优先本地 */
+/**
+ * 通道管理器：按网络状态路由（云端状态 → 云端大模型；离线 → 本地小模型）。
+ *
+ * - 联网/内网（[NetworkMonitor.online] = true）：云端大模型通道（更强算力）。
+ * - 离线：本地小模型通道；本地小模型未接入（isAvailable=false）时回退云端通道，
+ *   离线网络调用失败即降级留痕（见流水线 degradeReason）。
+ * - 设置页修改配置后调用 [reset] 重建。
+ */
 object ModelManager {
 
     @Volatile
-    private var cached: ModelProvider? = null
+    private var cachedCloud: ModelProvider? = null
 
-    /** 获取当前模型通道（缓存实例；设置页修改配置后调用 [reset] 重建） */
+    @Volatile
+    private var cachedLocal: ModelProvider? = null
+
+    /** 获取当前模型通道（按网络状态路由；缓存实例，配置变更后调用 [reset] 重建） */
     fun provider(context: android.content.Context): ModelProvider {
-        cached?.let { return it }
-        return synchronized(this) {
-            cached ?: buildProvider(context).also { cached = it }
+        val local = LocalModelProvider
+        return if (NetworkMonitor.isOnline(context)) {
+            // 云端状态：云端大模型（更强算力）
+            cachedCloud ?: synchronized(this) {
+                cachedCloud ?: CloudModelProvider(context).also { cachedCloud = it }
+            }
+        } else {
+            // 离线/本地网关：优先本地小模型；未接入时回退云端通道（离线即降级）
+            if (local.isAvailable(context)) {
+                cachedLocal ?: synchronized(this) {
+                    cachedLocal ?: local.also { cachedLocal = it }
+                }
+            } else {
+                cachedCloud ?: synchronized(this) {
+                    cachedCloud ?: CloudModelProvider(context).also { cachedCloud = it }
+                }
+            }
         }
     }
 
-    private fun buildProvider(context: android.content.Context): ModelProvider {
-        val local = LocalModelProvider
-        return if (local.isAvailable(context)) local else CloudModelProvider(context)
-    }
-
-    /** 设置变更后重建通道（新的 baseUrl/model/apiKey 生效） */
+    /** 设置变更后重建通道（新的 baseUrl/model/localModel/apiKey 生效） */
     fun reset() {
-        cached = null
+        cachedCloud = null
+        cachedLocal = null
     }
 }

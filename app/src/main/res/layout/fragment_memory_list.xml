@@ -170,6 +170,42 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:visibility="gone" />
+
+        <!-- 云端树断网锁定遮罩：白色虚化 + 中央锁 + 提示（阶段 2 修复 v2） -->
+        <LinearLayout
+            android:id="@+id/cloudLockOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#F5FFFFFF"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:contentDescription="云端树已锁定"
+                android:src="@drawable/ic_lock" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:text="当前为离线状态，云端树无法查看"
+                android:textColor="#37474F"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:lineSpacingExtra="4dp"
+                android:text="Network Gateway 断开\n内网记忆不可离线、不可脱离，联网后自动恢复"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textSize="12sp" />
+        </LinearLayout>
     </FrameLayout>
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton

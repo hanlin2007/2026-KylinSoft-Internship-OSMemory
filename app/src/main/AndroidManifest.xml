@@ -45,6 +45,11 @@
             </intent-filter>
         </activity>
         <activity
+            android:name=".phase3.notes.NoteEditorActivity"
+            android:exported="false"
+            android:label="@string/p3_notes_app_name"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
             android:name=".phase3.notes.NotesActivity"
             android:exported="true"
             android:label="@string/p3_notes_app_name"

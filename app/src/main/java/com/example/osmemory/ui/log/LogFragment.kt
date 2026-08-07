@@ -18,8 +18,9 @@ import com.google.android.material.tabs.TabLayout
 import kotlinx.coroutines.launch
 
 /**
- * 调用日志页（对应开发方案"日志三板块"）
- * 传入（COLLECT）/ 检索（RETRIEVE）/ 推理（INFER），TabLayout 切换，Flow 实时刷新
+ * 调用日志页（对应开发方案"日志板块"）
+ * 传入（COLLECT）/ 检索（RETRIEVE）/ 推理（INFER）/ 安全敏感（SECURITY），
+ * TabLayout 切换，Flow 实时刷新。安全敏感性展板只展示标记"敏感"的内容。
  */
 class LogFragment : Fragment() {
 
@@ -79,6 +80,6 @@ class LogFragment : Fragment() {
     companion object {
         fun newInstance() = LogFragment()
 
-        private val LOG_TYPES = listOf("COLLECT", "RETRIEVE", "INFER")
+        private val LOG_TYPES = listOf("COLLECT", "RETRIEVE", "INFER", "SECURITY")
     }
 }

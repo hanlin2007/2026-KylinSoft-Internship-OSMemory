@@ -36,6 +36,9 @@ class MemoryPipeline(
         const val LOG_RETRIEVE = "RETRIEVE"
         const val LOG_INFER = "INFER"
 
+        /** 安全敏感性日志（阶段 2 修复）：仅记录"敏感"标签内容——敏感记忆的传入/修改/检索/云端添加 */
+        const val LOG_SECURITY = "SECURITY"
+
         /** 云同步状态常量（与 MemoryItemEntity.syncState 对齐） */
         const val SYNC_LOCAL_ONLY = 0
         const val SYNC_PENDING = 1
@@ -153,6 +156,25 @@ class MemoryPipeline(
             )
         )
 
+        // ⑦ 安全敏感性日志：仅敏感记忆记录（安全门控命中 / AI 敏感标记 → 取并集）
+        if (secret) {
+            logDao.insert(
+                MemoryLogEntity(
+                    logType = LOG_SECURITY, action = "sensitive_add",
+                    appId = appId, memoIds = memoId, timestamp = now,
+                    source = source,
+                    contentSummary = "敏感记忆入库：${extracted.title}（命中规则：${gateResult.matchedRules.joinToString(",").ifBlank { "AI标记" }}）",
+                    tags = "敏感",
+                    extra = JsonTools.buildJson(
+                        "policyLevel" to 2,
+                        "matchedRules" to gateResult.matchedRules.joinToString(","),
+                        "llmSensitivity" to extracted.sensitivity,
+                        "degraded" to degraded
+                    )
+                )
+            )
+        }
+
         return CollectResult.Success(item, degraded)
     }
 
@@ -240,6 +262,26 @@ class MemoryPipeline(
                 )
             )
         )
+
+        // 安全敏感性日志：修改后仍是/变为敏感的记忆
+        if (sensitive) {
+            logDao.insert(
+                MemoryLogEntity(
+                    logType = LOG_SECURITY, action = "sensitive_update",
+                    appId = appId, memoIds = memoId, timestamp = now,
+                    source = updated.source,
+                    contentSummary = "敏感记忆修改：${updated.title}（命中规则：${gateResult.matchedRules.joinToString(",").ifBlank { "AI标记" }}）",
+                    tags = "敏感",
+                    extra = JsonTools.buildJson(
+                        "policyLevel" to 2,
+                        "matchedRules" to gateResult.matchedRules.joinToString(","),
+                        "llmSensitivity" to extracted.sensitivity,
+                        "degraded" to degraded
+                    )
+                )
+            )
+        }
+
         return UpdateResult.Success(updated, degraded)
     }
 }

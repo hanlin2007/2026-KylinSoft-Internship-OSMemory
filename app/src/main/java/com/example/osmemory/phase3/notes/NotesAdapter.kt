@@ -16,23 +16,8 @@ import java.util.Date
 import java.util.Locale
 
 internal class NotesAdapter(
-    private val onClick: (NoteRecord) -> Unit,
-    private val onLongClick: (NoteRecord) -> Unit
+    private val onClick: (NoteRecord) -> Unit
 ) : ListAdapter<NoteRecord, NotesAdapter.NoteViewHolder>(DIFF) {
-
-    private var selectedId: String? = null
-
-    fun select(noteId: String?) {
-        if (selectedId == noteId) return
-        val previous = selectedId
-        selectedId = noteId
-        currentList.indexOfFirst { it.id == previous }
-            .takeIf { it >= 0 }
-            ?.let(::notifyItemChanged)
-        currentList.indexOfFirst { it.id == noteId }
-            .takeIf { it >= 0 }
-            ?.let(::notifyItemChanged)
-    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NoteViewHolder =
         NoteViewHolder(
@@ -41,7 +26,7 @@ internal class NotesAdapter(
         )
 
     override fun onBindViewHolder(holder: NoteViewHolder, position: Int) {
-        holder.bind(getItem(position), getItem(position).id == selectedId)
+        holder.bind(getItem(position))
     }
 
     inner class NoteViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -50,7 +35,7 @@ internal class NotesAdapter(
         private val time = itemView.findViewById<TextView>(R.id.notesItemTime)
         private val memoryBadge = itemView.findViewById<TextView>(R.id.notesItemMemoryBadge)
 
-        fun bind(note: NoteRecord, selected: Boolean) {
+        fun bind(note: NoteRecord) {
             val context = itemView.context
             preview.text = note.content.trim().ifEmpty { "空白记录" }
             preview.alpha = if (note.content.isBlank()) 0.55f else 1f
@@ -68,17 +53,10 @@ internal class NotesAdapter(
                     if (note.isLinked) R.color.semantic_normal_bg else R.color.semantic_public_bg
                 )
             )
-            card.strokeWidth = if (selected) dp(2) else dp(1)
-            card.strokeColor = ContextCompat.getColor(
-                context,
-                if (selected) R.color.brand_primary else R.color.brand_outline
-            )
-            card.cardElevation = if (selected) dp(3).toFloat() else 0f
+            card.strokeWidth = dp(1)
+            card.strokeColor = ContextCompat.getColor(context, R.color.brand_outline)
+            card.cardElevation = 0f
             card.setOnClickListener { onClick(note) }
-            card.setOnLongClickListener {
-                onLongClick(note)
-                true
-            }
         }
 
         private fun dp(value: Int): Int =

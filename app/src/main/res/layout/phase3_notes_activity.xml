@@ -5,8 +5,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/brand_background"
-    android:orientation="vertical"
     android:fitsSystemWindows="true"
+    android:orientation="vertical"
     tools:context=".phase3.notes.NotesActivity">
 
     <com.google.android.material.appbar.MaterialToolbar
@@ -15,8 +15,6 @@
         android:layout_height="?attr/actionBarSize"
         android:background="@color/brand_primary"
         android:theme="@style/ThemeOverlay.Toolbar.OSMemory"
-        app:navigationContentDescription="返回 OS Memory"
-        app:navigationIcon="?attr/homeAsUpIndicator"
         app:subtitle="文字即记忆"
         app:subtitleTextColor="#DDE2FF"
         app:title="记事本"
@@ -28,9 +26,9 @@
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="16dp"
-        android:paddingTop="12dp"
+        android:paddingTop="14dp"
         android:paddingEnd="16dp"
-        android:paddingBottom="8dp">
+        android:paddingBottom="10dp">
 
         <TextView
             android:layout_width="0dp"
@@ -38,7 +36,7 @@
             android:layout_weight="1"
             android:text="我的记录"
             android:textColor="?attr/colorOnSurface"
-            android:textSize="17sp"
+            android:textSize="19sp"
             android:textStyle="bold" />
 
         <com.google.android.material.button.MaterialButton
@@ -47,24 +45,14 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:contentDescription="新增文字记录"
-            android:minHeight="40dp"
+            android:minHeight="44dp"
             android:text="＋ 新建" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/notesDeleteButton"
-            style="@style/Widget.Material3.Button.TextButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:contentDescription="删除当前文字记录"
-            android:minHeight="40dp"
-            android:text="删除"
-            android:textColor="@color/semantic_sensitive" />
     </LinearLayout>
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="132dp">
+        android:layout_height="0dp"
+        android:layout_weight="1">
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/notesList"
@@ -73,9 +61,10 @@
             android:clipToPadding="false"
             android:contentDescription="文字记录列表"
             android:paddingStart="12dp"
+            android:paddingTop="2dp"
             android:paddingEnd="12dp"
-            android:paddingBottom="8dp"
-            android:scrollbars="horizontal"
+            android:paddingBottom="20dp"
+            android:scrollbars="vertical"
             tools:listitem="@layout/phase3_notes_item" />
 
         <TextView
@@ -84,107 +73,9 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:gravity="center"
-            android:lineSpacingExtra="4dp"
+            android:lineSpacingExtra="5dp"
             android:text="还没有记录\n点击“新建”写下第一段文字"
             android:textColor="?android:attr/textColorSecondary"
-            android:textSize="14sp" />
+            android:textSize="15sp" />
     </FrameLayout>
-
-    <com.google.android.material.card.MaterialCardView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="4dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="16dp"
-        android:layout_weight="1"
-        app:cardBackgroundColor="?attr/colorSurface"
-        app:cardCornerRadius="18dp"
-        app:cardElevation="1dp"
-        app:strokeColor="@color/brand_outline"
-        app:strokeWidth="1dp">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:padding="14dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:id="@+id/notesMemoryStatus"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:textColor="?android:attr/textColorSecondary"
-                    android:textSize="12sp"
-                    tools:text="仅保存在本机 · 保存后可关联 OS Memory" />
-
-                <TextView
-                    android:id="@+id/notesCharacterCount"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:textColor="?android:attr/textColorSecondary"
-                    android:textSize="12sp"
-                    tools:text="128/5000" />
-            </LinearLayout>
-
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/notesEditorLayout"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_marginTop="8dp"
-                android:layout_weight="1"
-                android:hint="写下想记住的内容"
-                app:boxBackgroundMode="outline"
-                app:boxCornerRadiusBottomEnd="14dp"
-                app:boxCornerRadiusBottomStart="14dp"
-                app:boxCornerRadiusTopEnd="14dp"
-                app:boxCornerRadiusTopStart="14dp">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/notesEditor"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:gravity="top|start"
-                    android:inputType="textCapSentences|textMultiLine"
-                    android:maxLength="5000"
-                    android:minHeight="150dp"
-                    android:paddingTop="18dp"
-                    android:scrollbars="vertical"
-                    android:textSize="16sp" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/notesSaveButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:contentDescription="保存文字记录"
-                    android:minHeight="48dp"
-                    android:text="保存" />
-
-                <ProgressBar
-                    android:id="@+id/notesProgress"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:layout_gravity="center_vertical|end"
-                    android:layout_marginEnd="18dp"
-                    android:indeterminateTint="@color/white"
-                    android:visibility="gone" />
-            </FrameLayout>
-        </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
 </LinearLayout>

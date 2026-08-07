@@ -17,8 +17,8 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 记忆调用日志适配器（三板块共用）
- * 展示：类型徽标（传入/检索/推理）/ 动作 / 时间 / 内容摘要 / 来源 / 应用 / 标签
+ * 记忆调用日志适配器（四板块共用）
+ * 展示：类型徽标（传入/检索/推理/安全敏感）/ 动作 / 时间 / 内容摘要 / 来源 / 应用 / 标签
  */
 class LogAdapter : ListAdapter<MemoryLogEntity, LogAdapter.ViewHolder>(DIFF) {
 
@@ -49,6 +49,7 @@ class LogAdapter : ListAdapter<MemoryLogEntity, LogAdapter.ViewHolder>(DIFF) {
                 "COLLECT" -> Triple("传入", R.color.log_collect, R.color.log_collect_bg)
                 "RETRIEVE" -> Triple("检索", R.color.log_retrieve, R.color.log_retrieve_bg)
                 "INFER" -> Triple("推理", R.color.log_infer, R.color.log_infer_bg)
+                "SECURITY" -> Triple("安全敏感", R.color.semantic_sensitive, R.color.semantic_sensitive_bg)
                 else -> Triple(log.logType, R.color.semantic_public, R.color.semantic_public_bg)
             }
             tvTypeBadge.text = typeLabel

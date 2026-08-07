@@ -16,8 +16,6 @@
         android:layout_height="?attr/actionBarSize"
         android:background="@color/brand_primary"
         android:theme="@style/ThemeOverlay.Toolbar.OSMemory"
-        app:navigationContentDescription="返回 OS Memory"
-        app:navigationIcon="?attr/homeAsUpIndicator"
         app:subtitle="让记忆长出新的分类"
         app:subtitleTextColor="#DDE2FF"
         app:title="文件分类器"

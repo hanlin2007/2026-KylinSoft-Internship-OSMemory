@@ -7,7 +7,7 @@
     <item
         android:id="@+id/action_sync_cloud"
         android:icon="@drawable/ic_menu_library"
-        android:title="同步到云端（单向拉取）" />
+        android:title="同步到云端" />
     <item
         android:id="@+id/action_model_settings"
         android:icon="@drawable/ic_menu_logs"

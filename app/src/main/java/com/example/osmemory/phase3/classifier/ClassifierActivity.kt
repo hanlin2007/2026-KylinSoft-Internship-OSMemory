@@ -14,7 +14,6 @@ import com.example.osmemory.core.model.ModelManager
 import com.example.osmemory.phase3.api.MemoryApiService
 import com.example.osmemory.phase3.api.MemoryMemo
 import com.example.osmemory.phase3.api.Phase3App
-import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
@@ -53,8 +52,6 @@ class ClassifierActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.phase3_classifier_activity)
 
-        findViewById<MaterialToolbar>(R.id.p3_classifier_toolbar)
-            .setNavigationOnClickListener { finish() }
         defaultCategoryGroup = findViewById(R.id.p3_classifier_default_categories)
         generatedCategoryGroup = findViewById(R.id.p3_classifier_generated_categories)
         generatedTitle = findViewById(R.id.p3_classifier_generated_title)

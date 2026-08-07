@@ -1,10 +1,11 @@
 # OS Memory 开发计划（4 阶段并行交付版）
 
 > 分支：`api-key-warning`（阶段 1 修复 + 阶段 2 在本分支完成，由本人手动 commit）
+> 阶段 2 修复：分支 `phase2-fix`（基于 `api-key-warning`，提交 `8df81bd`）
 > 权威参考：`OS_Memory_初步调研与系统设计_修改版.pptx`（一切设计以 PPT 为最终标准）
 > 工程基线：Android 原生应用形态（Kotlin + XML View，无 Compose），单 `:app` 模块
 > 技术决策（2026-08-05 确认）：Room 数据库 · 云端大模型替代端侧小模型（双通道，杜绝规则引擎）· 精致控制台 + 示例数据一键装载
-> 模型配置：BaseURL `https://api.ppio.com/openai/v1`（⚠️ 必须含 `/v1`，真实终端 `https://api.ppio.com/openai/v1/chat/completions`）· Model `deepseek/deepseek-v4-flash` · API Key 见 `core/ModelConfig.kt`（2026-08-06 轮换，演示用，提交前建议再轮换）
+> 模型配置：BaseURL `https://api.ppio.com/openai/v1`（必须含 `/v1`）· 云端 Model `deepseek/deepseek-v4-flash` · 本地 Model `local/qwen2.5-coder-1.5b`（阶段 4 接入）· API Key 仅由本机配置或设置页注入，不进入源码与 Git 历史。
 
 ---
 
@@ -87,10 +88,27 @@
 - **模型设置页**（`ui/settings/ModelSettingsFragment`）：改 BaseURL/Model/API Key，测试连接（成功/失败+原因直显），保存即热插拔通道（`ModelManager.reset()`）
 - **审计导出**（`data/AuditExporter`）：本地树 + 云端树 + 全部日志序列化为 JSON 审计快照，经系统文档创建器（SAF）导出
 
+## 阶段 2 修复清单（2026-08-07，分支 `phase2-fix`）
+
+评审后集中修复的问题：
+
+| # | 问题 | 修复 |
+|---|---|---|
+| G1 | 记忆导出（JSON）在 Pixel 上无查看器无法可视化 | 改为**自包含可视化 HTML** 导出（`AuditExporter.buildHtml`，样式内联、浏览器直接打开；原始 JSON 保留在页面底部 `<details>` 折叠块）；SAF 导出 MIME 改为 `text/html` |
+| G2 | 网关"分离"理解偏差：应支持更强"云端算力"的云状态 | 明确双插拔接口：**云端大模型**（联网/内网 = 云端状态，更强算力）+ **本地小模型**（离线/本地网关，手机端部署，预留存根）。两者**共享 BaseURL 与端点，仅 Model ID 不同**（`ModelConfig` 新增 `localModel` 字段 + 设置页输入框），`ModelManager` 按网络状态路由，热插拔零业务改动 |
+| G3 | 云端树敏感判断被设计成"一律敏感"（一片大红） | **敏感判断与本地一致**：本地同步保留原判断（policyLevel 原值带入），云端创建按 `SecurityGate` + LLM 取并集判断；来源两分徽标（`CloudMemoryItemEntity.origin`：来自本地同步 / 云端创建，memoId 前缀计算属性，零迁移） |
+| G4 | 同步仅限"首次联网且云端树为空" | **每次 离线→在线 网络切换都自动拉取**：`MainActivity` 触发 `ensureCloudIntegrated()` → `autoIntegrateIfNeeded()`，与本地记忆「保密不迁移云端」选项联动（`cloudSyncCandidates` 按 `cloudEligible`/`policyLevel<2` 过滤，敏感/保密记忆永不外发） |
+| G5 | 云端树缺记忆添加入口（FAB） | 云端态 FAB 分支到 `showCloudAddDialog()` → `addToCloud`（云端创建，敏感判断与本地一致；断网返回 Unreachable 提示） |
+| G6 | 断网时云端树面板仍可查看 | 断网时云端树**白色虚化锁定遮罩**（中央锁 + "当前为离线状态，云端树无法查看"提示），内容不可查看；内网记忆不可离线、不可脱离，本地永不 pull 云端 |
+| G7 | 抽屉侧栏头部与系统状态栏重叠 | `MainActivity.fixNavHeaderStatusBarInset`：头部整体下移一个状态栏高度，保证可读可点击 |
+| G8 | 示例数据含 mentor 表述 | 替换为"高中同学/同学聚会/同学关系"（联系人类样本，中性化） |
+| G9 | 调用日志只有三板块，敏感链路不可见 | 新增第四板块 **「安全敏感」**（`logType=SECURITY`，与传入/检索/推理并列）：敏感记忆的 入库/修改/检索命中/云端保守策略 全部留痕（仅"敏感"标签内容） |
+
 ## 版本状态记录
 
 - [x] **阶段 1 最小系统** — 2026-08-05 完成
 - [x] **阶段 1 评审修复 + 阶段 2 控制台完整版/检索/画像** — 2026-08-07 完成（分支 `api-key-warning`，未提交，等待手动 commit）
+- [x] **阶段 2 修复（网关双插拔/云树敏感判断与本地一致+来源两分/每次联网自动拉取/云树 FAB/断网锁屏遮罩/抽屉修复/mentor 替换/安全敏感日志/可视化导出）** — 2026-08-07 完成（提交 `8df81bd`）
 - [x] **阶段 3 vibe 三应用 + 系统 API 封装** — 2026-08-07 完成（分支 `phase3-dev`）
 - [ ] **阶段 4 进阶整合 + 演示打磨**
 

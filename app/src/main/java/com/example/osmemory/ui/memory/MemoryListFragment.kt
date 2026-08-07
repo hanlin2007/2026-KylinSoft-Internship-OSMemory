@@ -21,6 +21,7 @@ import com.example.osmemory.R
 import com.example.osmemory.core.pipeline.MemoryPipeline
 import com.example.osmemory.data.MemoryRepository
 import com.example.osmemory.data.MemoryService
+import com.example.osmemory.data.cloud.TreeSyncManager
 import com.example.osmemory.data.db.entity.MemoryItemEntity
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -33,11 +34,14 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 记忆库页（阶段 1 修复 + 阶段 2）
+ * 记忆库页（阶段 1 修复 + 阶段 2 + 阶段 2 修复）
  *
- * - 网络状态条：在线/离线 + Cloud Tree 可达 + 模型最近调用（降级原因可见）
- * - 双树切换：本地树（Local Tree，source of truth）/ 云端树（Cloud Tree，单向镜像）
+ * - 网络状态条：在线（内网）/离线 + Cloud Tree 可达 + 模型最近调用（降级原因可见）
+ * - 双树切换：本地树（Local Tree，source of truth）/ 云端树（Cloud Tree，内网云端库）
+ *   - 断网：云端树面板锁定——白色虚化遮罩 + 中央锁（内容不可查看，不拉取云端记忆）
+ *   - 联网（内网）：云端树可用；每次联网自动拉取本地待同步记忆（敏感/保密记忆除外）
  * - 语义检索：关键词召回 + LLM 重排（阶段 2）
+ * - FAB：本地树添加本地记忆；云端树添加云端记忆（云端创建，敏感判断与本地一致）
  * - 交互：单击卡片 = 查看 + 编辑（先画像后改）；长按 = 删除
  */
 class MemoryListFragment : Fragment() {
@@ -58,6 +62,9 @@ class MemoryListFragment : Fragment() {
     /** 搜索态：非空表示正在展示检索结果 */
     private var searchResults: List<MemoryRow>? = null
 
+    /** 当前已渲染的树（双树内容完全不同，切换时整体替换，不走 diff 动画） */
+    private var shownTree: String? = null
+
     private var online = false
 
     override fun onCreateView(
@@ -77,6 +84,8 @@ class MemoryListFragment : Fragment() {
         val rv = view.findViewById<RecyclerView>(R.id.rvMemory)
         rv.layoutManager = LinearLayoutManager(requireContext())
         rv.adapter = adapter
+        // 双树切换整体换列表时禁用 item 动画，避免内容交叉淡入造成的闪屏
+        rv.itemAnimator = null
 
         view.findViewById<FloatingActionButton>(R.id.fabAdd).setOnClickListener { showAddDialog() }
 
@@ -96,7 +105,7 @@ class MemoryListFragment : Fragment() {
             repo.observeNetwork().collect { isOnline ->
                 online = isOnline
                 val badge = root.findViewById<TextView>(R.id.tvNetworkBadge)
-                badge.text = if (isOnline) "在线" else "离线"
+                badge.text = if (isOnline) "在线（内网）" else "离线"
                 badge.setTextColor(
                     ContextCompat.getColor(requireContext(),
                         if (isOnline) R.color.semantic_normal else R.color.semantic_sensitive)
@@ -106,7 +115,10 @@ class MemoryListFragment : Fragment() {
                         ContextCompat.getColor(requireContext(),
                             if (isOnline) R.color.semantic_normal_bg else R.color.semantic_sensitive_bg)
                     )
+                // 断网：云端树面板锁定（白色虚化 + 中央锁遮罩）；不把云端记忆拉取到本地
+                updateCloudLock(root)
                 updateCloudStatus(root)
+                updateEmpty(root)
             }
         }
         viewLifecycleOwner.lifecycleScope.launch {
@@ -136,14 +148,25 @@ class MemoryListFragment : Fragment() {
         }
     }
 
+    /** 云端树断网锁定遮罩：白色虚化 + 中央锁 + 提示（断网时云端树内容不可查看） */
+    private fun updateCloudLock(root: View) {
+        root.findViewById<View>(R.id.cloudLockOverlay).isVisible = currentTree == "CLOUD" && !online
+    }
+
     private fun updateCloudStatus(root: View) {
         val tv = root.findViewById<TextView>(R.id.tvCloudStatus)
         val last = repo.observeLastSync().value
         tv.text = when {
-            !online -> "Cloud Tree 不可达（Network Gateway 断开，本地树独立可用）"
-            last == null -> "Cloud Tree 可达 · 尚未同步（可在抽屉触发「同步到云端」）"
-            else -> "Cloud Tree 可达 · 最近同步：${last.message}"
+            !online -> "Cloud Tree 不可达（Network Gateway 断开 · 已锁定）"
+            last == null -> "Cloud Tree 可达 · 每次联网自动拉取待同步记忆"
+            else -> "Cloud Tree 可达 · 最近拉取：${last.message}"
         }
+    }
+
+    /** FAB 显示规则：非搜索态显示（本地树/云端树都有添加入口）；云端树断网锁定时不显示 */
+    private fun updateFab(root: View) {
+        root.findViewById<FloatingActionButton>(R.id.fabAdd).isVisible =
+            searchResults == null && !(currentTree == "CLOUD" && !online)
     }
 
     // ---------- 双树切换 ----------
@@ -155,7 +178,8 @@ class MemoryListFragment : Fragment() {
                 currentTree = if (tab.position == 0) "LOCAL" else "CLOUD"
                 searchResults = null
                 view.findViewById<EditText>(R.id.etSearch).setText("")
-                view.findViewById<FloatingActionButton>(R.id.fabAdd).isVisible = currentTree == "LOCAL"
+                updateCloudLock(view)
+                updateFab(view)
                 render(view)
             }
 
@@ -193,7 +217,7 @@ class MemoryListFragment : Fragment() {
         clear.setOnClickListener {
             et.setText("")
             searchResults = null
-            view.findViewById<FloatingActionButton>(R.id.fabAdd).isVisible = currentTree == "LOCAL"
+            updateFab(view)
             render(view)
         }
         et.setOnEditorActionListener { _, _, _ -> runSearch(); true }
@@ -227,7 +251,15 @@ class MemoryListFragment : Fragment() {
             "LOCAL" -> localRows
             else -> cloudRows
         }
-        adapter.submitList(visibleRows)
+        if (searchResults == null && shownTree != currentTree) {
+            // 双树内容完全不同：先同步清空、再整体填充（跳过异步 diff 与动画），避免切回本地树时闪一下
+            adapter.submitList(null)
+            adapter.submitList(visibleRows)
+            shownTree = currentTree
+        } else {
+            adapter.submitList(visibleRows)
+        }
+        updateCloudLock(root)
         updateEmpty(root)
     }
 
@@ -235,8 +267,7 @@ class MemoryListFragment : Fragment() {
         val tvEmpty = root.findViewById<TextView>(R.id.tvEmpty)
         val emptyText = when {
             searchResults != null -> "检索无结果\n换一个关键词试试，或清空搜索回到树视图"
-            currentTree == "CLOUD" && !online -> "云端树离线不可达\nNetwork Gateway 断开：本地树独立可用，云端内容无法访问"
-            currentTree == "CLOUD" -> "云端树为空\n本地树中有记忆时，可从抽屉「同步到云端」单向拉取"
+            currentTree == "CLOUD" -> "云端树为空\n联网后会自动拉取本地待同步记忆（敏感/保密记忆除外）"
             else -> "本地树为空\n点击右下角 + 添加一条记忆\n或从抽屉「装载示例数据」一键演示"
         }
         tvEmpty.text = emptyText
@@ -246,6 +277,15 @@ class MemoryListFragment : Fragment() {
     // ---------- 添加记忆 ----------
 
     private fun showAddDialog() {
+        if (currentTree == "CLOUD") {
+            showCloudAddDialog()
+            return
+        }
+        showLocalAddDialog()
+    }
+
+    /** 本地树添加：走标准流水线（净化→门控→LLM 抽取→去重→入库→双日志） */
+    private fun showLocalAddDialog() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_add_memory, null)
         val etContent = dialogView.findViewById<EditText>(R.id.etContent)
         val spSource = dialogView.findViewById<Spinner>(R.id.spSource)
@@ -261,6 +301,33 @@ class MemoryListFragment : Fragment() {
                 }
                 val source = SOURCES[spSource.selectedItemPosition]
                 addMemory(text, source)
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    /** 云端树添加（阶段 2 修复：云端态 FAB 添加入口，敏感判断与本地一致） */
+    private fun showCloudAddDialog() {
+        if (!online) {
+            Toast.makeText(requireContext(), "云端树离线不可查看，无法添加", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val dialogView = layoutInflater.inflate(R.layout.dialog_add_memory, null)
+        val etContent = dialogView.findViewById<EditText>(R.id.etContent)
+        val spSource = dialogView.findViewById<Spinner>(R.id.spSource)
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("添加记忆（云端树 · 云端创建）")
+            .setMessage("在云端/内网环境中创建记忆：敏感判断与本地一致（命中敏感规则或 LLM 标记即标敏感），断网后云端树不可查看。")
+            .setView(dialogView)
+            .setPositiveButton("存入云端树") { _, _ ->
+                val text = etContent.text?.toString()?.trim().orEmpty()
+                if (text.isEmpty()) {
+                    Toast.makeText(requireContext(), "记忆内容为空", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                val source = SOURCES[spSource.selectedItemPosition]
+                addCloudMemory(text, source)
             }
             .setNegativeButton("取消", null)
             .show()
@@ -282,6 +349,29 @@ class MemoryListFragment : Fragment() {
                     Toast.makeText(ctx, "重复记忆已拒绝（命中 ${result.existing.memoId}，24h 内同源同内容）", Toast.LENGTH_LONG).show()
                 is MemoryPipeline.CollectResult.Rejected ->
                     Toast.makeText(ctx, "记忆被拒绝：${result.reason}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    /** 云端树添加（云端创建，敏感判断与本地一致；断网 Unreachable） */
+    private fun addCloudMemory(text: String, source: String) {
+        val pb = view?.findViewById<ProgressBar>(R.id.pbLoading)
+        pb?.isVisible = true
+        viewLifecycleOwner.lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                repo.addToCloud(text, source, appId = MemoryPipeline.CONSOLE_APP_ID)
+            }
+            pb?.isVisible = false
+            val ctx = requireContext()
+            when (result) {
+                is TreeSyncManager.CloudAddResult.Success -> {
+                    val suffix = if (result.degraded) "（模型通道不可用，已降级原文入库）" else ""
+                    Toast.makeText(ctx, "已存入云端树（敏感）${suffix}：${result.item.title}", Toast.LENGTH_LONG).show()
+                }
+                is TreeSyncManager.CloudAddResult.Rejected ->
+                    Toast.makeText(ctx, "云端树拒绝：${result.reason}", Toast.LENGTH_LONG).show()
+                TreeSyncManager.CloudAddResult.Unreachable ->
+                    Toast.makeText(ctx, "云端树离线不可达，无法添加", Toast.LENGTH_LONG).show()
             }
         }
     }

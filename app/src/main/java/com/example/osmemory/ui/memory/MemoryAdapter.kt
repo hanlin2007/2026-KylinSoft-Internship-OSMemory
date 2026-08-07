@@ -173,6 +173,8 @@ data class MemoryRow(
         }
 
         fun fromCloud(item: CloudMemoryItemEntity): MemoryRow {
+            // 来源两分：本地同步（保留本地敏感判断）/ 云端创建（按内容判断）
+            val fromLocalSync = item.origin == CloudMemoryItemEntity.ORIGIN_LOCAL_SYNC
             return MemoryRow(
                 key = item.id,
                 memoId = item.memoId,
@@ -184,7 +186,7 @@ data class MemoryRow(
                 policyLevel = item.policyLevel,
                 confidence = item.confidence,
                 createdAt = item.createdAt,
-                syncLabel = "云端",
+                syncLabel = if (fromLocalSync) "来自本地同步" else "云端创建",
                 syncColorRes = R.color.log_collect,
                 syncBgRes = R.color.log_collect_bg,
                 tree = "CLOUD"

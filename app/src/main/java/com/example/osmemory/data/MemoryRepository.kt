@@ -58,7 +58,7 @@ class MemoryRepository(private val context: Context) {
         val reranker = SemanticReranker(provider)
         retriever = MemoryRetriever(itemDao, logDao, reranker)
         profileBuilder = ProfileBuilder(provider, itemDao, logDao)
-        syncManager = TreeSyncManager(context, itemDao, cloudDao, logDao)
+        syncManager = TreeSyncManager(context, itemDao, cloudDao, logDao, provider)
     }
 
     /** 当前模型通道名（控制台展示） */
@@ -137,10 +137,26 @@ class MemoryRepository(private val context: Context) {
         appDao.upsert(RegisteredAppEntity(appId = appId, appName = appName, scope = scope))
     }
 
-    // ---------- 本地树 ↔ 云端树 单向同步（Network Gateway） ----------
+    // ---------- 本地树 ↔ 云端树 单向同步（Network Gateway，阶段 2 修复：自动整合 + 云端 FAB） ----------
 
     /** 触发一次 本地→云端 单向同步（在线才真正推送，离线返回不可达报告） */
     suspend fun syncNow(): TreeSyncManager.SyncReport = syncManager.sync()
+
+    /**
+     * 联网自动拉取：每次 离线→在线 网络切换时把本地待同步记忆拉取到云端树
+     * （由 MainActivity 监听网络状态触发；敏感/保密记忆由 cloudEligible 隔离）。离线返回 null。
+     */
+    suspend fun ensureCloudIntegrated(): TreeSyncManager.SyncReport? {
+        if (!NetworkMonitor.isOnline(context)) return null
+        return syncManager.autoIntegrateIfNeeded()
+    }
+
+    /** 云端树 FAB 添加入口：云端创建记忆，敏感判断与本地一致（断网返回 Unreachable） */
+    suspend fun addToCloud(
+        content: String,
+        source: String,
+        appId: String = MemoryPipeline.CONSOLE_APP_ID
+    ): TreeSyncManager.CloudAddResult = syncManager.addToCloud(content, source, appId)
 
     // ---------- 记忆画像（阶段 2） ----------
 
@@ -150,11 +166,11 @@ class MemoryRepository(private val context: Context) {
         return result
     }
 
-    // ---------- 模型设置（阶段 2） ----------
+    // ---------- 模型设置（阶段 2 + 阶段 2 修复：云端/本地双插拔） ----------
 
     /** 保存模型配置并重建通道；测试连接由调用方执行 complete */
-    fun saveModelConfig(baseUrl: String, model: String, apiKey: String) {
-        ModelConfig.save(context, baseUrl, model, apiKey)
+    fun saveModelConfig(baseUrl: String, model: String, apiKey: String, localModel: String? = null) {
+        ModelConfig.save(context, baseUrl, model, apiKey, localModel)
         ModelManager.reset()
         ModelDiagnostics.reset()
         refreshChannels()
@@ -180,11 +196,15 @@ class MemoryRepository(private val context: Context) {
         }
     }
 
-    // ---------- 审计导出（阶段 2） ----------
+    // ---------- 审计导出（阶段 2 + 阶段 2 修复：可视化 HTML） ----------
 
     /** 生成审计 JSON（本地树 + 云端树 + 全部日志） */
     suspend fun exportAuditJson(): String =
         AuditExporter.build(itemDao.allItems(), cloudDao.all(), logDao.observeAllNow())
+
+    /** 生成可视化审计快照（自包含 HTML，手机上浏览器直接打开查看，内含原始 JSON） */
+    suspend fun exportAuditHtml(): String =
+        AuditExporter.buildHtml(itemDao.allItems(), cloudDao.all(), logDao.observeAllNow())
 
     // ---------- 演示工具 ----------
 

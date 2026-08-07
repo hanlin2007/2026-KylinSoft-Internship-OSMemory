@@ -13,7 +13,10 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /**
- * 云端大模型通道：OpenAI 兼容 Chat Completions（阶段 1 默认通道）
+ * 云端大模型通道：OpenAI 兼容 Chat Completions（联网/内网 = "云端状态"时的默认通道）
+ *
+ * 网关语义（对齐产品设计）：联网/政企内网视为"云端状态"，使用更强的云端算力；
+ * 与本地小模型通道共享 BaseURL/端点，仅 Model ID 不同（见 [ModelConfig.DEFAULT_LOCAL_MODEL]）。
  *
  * - 端点自动适配：{base}/chat/completions；当 base 不含 /v1 时，网关返回任意非 2xx 自动重试 {base}/v1/chat/completions
  *   （真实终端 https://api.ppio.com/openai/v1/chat/completions，base 已默认含 /v1，见 [ModelConfig]）

@@ -7,6 +7,7 @@ import com.example.osmemory.data.db.dao.MemoryLogDao
 import com.example.osmemory.data.db.entity.MemoryItemEntity
 import com.example.osmemory.data.db.entity.MemoryLogEntity
 import com.example.osmemory.core.pipeline.MemoryPipeline.Companion.LOG_RETRIEVE
+import com.example.osmemory.core.pipeline.MemoryPipeline.Companion.LOG_SECURITY
 
 /**
  * 记忆检索（对应 PPT get_memo / Retrieval + Context Compiler）
@@ -65,6 +66,27 @@ class MemoryRetriever(
 
         // 命中自增（复用频率 / 质量字段）
         result.forEach { itemDao.bumpReuseCount(it.id) }
+
+        // 安全敏感性日志：命中敏感记忆（policyLevel=2）时留痕（仅"敏感"标签内容）
+        val sensitiveHits = result.filter { it.policyLevel >= 2 }
+        if (sensitiveHits.isNotEmpty()) {
+            logDao.insert(
+                MemoryLogEntity(
+                    logType = LOG_SECURITY, action = "sensitive_retrieve",
+                    appId = appId,
+                    memoIds = sensitiveHits.joinToString(",") { it.memoId },
+                    timestamp = now,
+                    source = "system",
+                    contentSummary = "检索命中 ${sensitiveHits.size} 条敏感记忆（查询：${TextTools.truncate(query, 30)}）",
+                    tags = "敏感",
+                    extra = JsonTools.buildJson(
+                        "policyLevel" to 2,
+                        "policyMax" to policyMax,
+                        "hits" to sensitiveHits.size
+                    )
+                )
+            )
+        }
 
         // 检索日志（对应日志"检索"板块，含重排状态）
         logDao.insert(

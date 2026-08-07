@@ -5,7 +5,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * 记忆调用日志（对应开发方案"日志三板块"）
+ * 记忆调用日志（对应开发方案"日志板块"）
  *
  * logType：
  *  - COLLECT  记忆传入：每条记忆进来时留一条（时间/来源/内容/标签）
