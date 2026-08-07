@@ -12,9 +12,9 @@ enum class Phase3App(
     val source: String,
     val scope: MemoryScope
 ) {
-    NOTES("app_notes", "记事本", "notes", MemoryScope.WRITE),
-    CHAT("app_chat", "对话问答", "chat", MemoryScope.READ_WRITE),
-    CLASSIFIER("app_files", "文件分类器", "files", MemoryScope.READ_WRITE)
+    NOTES("app_notes", "备忘录", "notes", MemoryScope.WRITE),
+    CHAT("app_chat", "ChatBot", "chat", MemoryScope.READ_WRITE),
+    CLASSIFIER("app_files", "文件分类管理器", "files", MemoryScope.READ_WRITE)
 }
 
 enum class MemoryScope {

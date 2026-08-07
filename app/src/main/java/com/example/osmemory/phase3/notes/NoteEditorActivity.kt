@@ -104,20 +104,6 @@ class NoteEditorActivity : AppCompatActivity() {
         updateControls()
     }
 
-    private fun refreshFromStore() {
-        val note = currentNote
-        if (note == null) {
-            finish()
-            return
-        }
-        boundContent = note.content
-        bindingEditor = true
-        editor.setText(note.content)
-        editor.setSelection(editor.text?.length ?: 0)
-        bindingEditor = false
-        updateControls()
-    }
-
     private fun updateControls() {
         val note = currentNote
         val length = editor.text?.length ?: 0
@@ -162,7 +148,10 @@ class NoteEditorActivity : AppCompatActivity() {
         when {
             !saved.isLinked -> offerMemoryAssociation(saved)
             !saved.memoryIsCurrent -> offerMemoryUpdate(saved)
-            else -> Toast.makeText(this, "关联记忆已是最新内容", Toast.LENGTH_SHORT).show()
+            else -> {
+                Toast.makeText(this, "关联记忆已是最新内容", Toast.LENGTH_SHORT).show()
+                finish()
+            }
         }
     }
 
@@ -171,7 +160,8 @@ class NoteEditorActivity : AppCompatActivity() {
             .setTitle("关联到 OS Memory？")
             .setMessage("关联后，这段文字会立即进入本地记忆数据流，并可被其他已授权应用使用。")
             .setPositiveButton("关联记忆") { _, _ -> collectMemory(note.id) }
-            .setNegativeButton("仅保存在记事本", null)
+            .setNegativeButton("仅保存在备忘录") { _, _ -> finish() }
+            .setCancelable(false)
             .show()
     }
 
@@ -180,7 +170,8 @@ class NoteEditorActivity : AppCompatActivity() {
             .setTitle("更新关联记忆？")
             .setMessage("这条记录已关联 OS Memory。是否用刚保存的文字更新对应记忆？")
             .setPositiveButton("更新记忆") { _, _ -> updateMemory(note.id) }
-            .setNegativeButton("暂不更新", null)
+            .setNegativeButton("暂不更新") { _, _ -> finish() }
+            .setCancelable(false)
             .show()
     }
 
@@ -217,7 +208,7 @@ class NoteEditorActivity : AppCompatActivity() {
                 ).show()
             }
             setBusy(false)
-            refreshFromStore()
+            finish()
         }
     }
 
@@ -260,7 +251,7 @@ class NoteEditorActivity : AppCompatActivity() {
                 ).show()
             }
             setBusy(false)
-            refreshFromStore()
+            finish()
         }
     }
 

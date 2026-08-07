@@ -18,7 +18,7 @@
         android:theme="@style/ThemeOverlay.Toolbar.OSMemory"
         app:subtitle="让记忆长出新的分类"
         app:subtitleTextColor="#DDE2FF"
-        app:title="文件分类器"
+        app:title="文件分类管理器"
         app:titleTextColor="@color/white" />
 
     <ScrollView

@@ -17,7 +17,7 @@
         android:theme="@style/ThemeOverlay.Toolbar.OSMemory"
         app:subtitle="文字即记忆"
         app:subtitleTextColor="#DDE2FF"
-        app:title="记事本"
+        app:title="备忘录"
         app:titleTextColor="@color/white" />
 
     <LinearLayout
