@@ -1,11 +1,10 @@
 # OS Memory 开发计划（4 阶段并行交付版）
 
-> 分支：`api-key-warning`（阶段 1 修复 + 阶段 2 在本分支完成，由本人手动 commit）
-> 阶段 2 修复：分支 `phase2-fix`（基于 `api-key-warning`，提交 `8df81bd`）
+> 当前整合分支：`phase4-dev`；阶段 2 修复与阶段 3 已整合为提交 `44fdd49`
 > 权威参考：`OS_Memory_初步调研与系统设计_修改版.pptx`（一切设计以 PPT 为最终标准）
-> 工程基线：Android 原生应用形态（Kotlin + XML View，无 Compose），单 `:app` 模块
-> 技术决策（2026-08-05 确认）：Room 数据库 · 云端大模型替代端侧小模型（双通道，杜绝规则引擎）· 精致控制台 + 示例数据一键装载
-> 模型配置：BaseURL `https://api.ppio.com/openai/v1`（必须含 `/v1`）· 云端 Model `deepseek/deepseek-v4-flash` · 本地 Model `local/qwen2.5-coder-1.5b`（阶段 4 接入）· API Key 仅由本机配置或设置页注入，不进入源码与 Git 历史。
+> 工程基线：Android 原生应用形态（Kotlin + XML View，无 Compose），`:app` + `:llama-runtime` 模块
+> 技术决策：Room 数据库 · 在线云端大模型/离线 llama.cpp 端侧模型双通道 · 精致控制台 + 示例数据一键装载
+> 模型配置：BaseURL `https://api.ppio.com/openai/v1`（必须含 `/v1`）· 云端 Model `deepseek/deepseek-v4-flash` · 端侧 Model `Qwen2.5-0.5B-Instruct Q4_K_M` · API Key 仅由本机配置或设置页注入，不进入源码与 Git 历史。
 
 ---
 
@@ -44,7 +43,7 @@
 - **MemoryRetriever（基础版）**：关键词召回 + 权限过滤（policyLevel≤申请方权限），每次调用留 RETRIEVE 日志（语义重排在阶段 2）
 - **ModelProvider 双通道**：
   - `CloudModelProvider`：OpenAI 兼容 `POST {base}/chat/completions`（端点自动适配 `/v1` 变体），30s 超时，健壮 JSON 提取（容忍 markdown fence / 截断）
-  - `LocalModelProvider`：扩展点存根——Android 上部署本地小模型**可行**（llama.cpp Android / MLC-LLM 跑 GGUF，需 NDK 与模型文件，演示环境暂不启用），接口签名与云端一致，后续替换即热插拔
+  - `LocalModelProvider`：llama.cpp Android/JNI + Qwen2.5-0.5B-Instruct Q4_K_M；模型运行时下载校验，离线直接推理
 
 ### 1.4 控制台 V1
 - 底部导航两页：**记忆库** / **调用日志**
@@ -60,7 +59,7 @@
 1. Sync 通过（若 KSP 报错按 1.1 预案改版本）
 2. 启动 → 工具栏"装载示例数据" → 记忆库出现 10 张记忆卡，日志出现批量"传入"流水
 3. FAB 添加一条普通记忆（如"我周末喜欢去西湖跑步"）→ 卡片出现且带分类/标签/置信度，日志"传入"+"推理"各 +1 条（推理=LLM 抽取记录）
-4. 断网添加一条记忆 → 正常入库（降级路径），日志标注"降级"
+4. 断网添加一条记忆 → 端侧 Qwen 完成结构化抽取并正常入库，日志标注端侧模型且不降级
 5. 添加含"身份证号 110101199001011234"的记忆 → 卡片标"敏感"徽标
 6. 重复添加同一条 → 第二次被拒并记录日志
 7. 日志页三板块切换正常
@@ -95,7 +94,7 @@
 | # | 问题 | 修复 |
 |---|---|---|
 | G1 | 记忆导出（JSON）在 Pixel 上无查看器无法可视化 | 改为**自包含可视化 HTML** 导出（`AuditExporter.buildHtml`，样式内联、浏览器直接打开；原始 JSON 保留在页面底部 `<details>` 折叠块）；SAF 导出 MIME 改为 `text/html` |
-| G2 | 网关"分离"理解偏差：应支持更强"云端算力"的云状态 | 明确双插拔接口：**云端大模型**（联网/内网 = 云端状态，更强算力）+ **本地小模型**（离线/本地网关，手机端部署，预留存根）。两者**共享 BaseURL 与端点，仅 Model ID 不同**（`ModelConfig` 新增 `localModel` 字段 + 设置页输入框），`ModelManager` 按网络状态路由，热插拔零业务改动 |
+| G2 | 网关"分离"理解偏差：应支持更强"云端算力"的云状态 | 阶段 2 先建立云端/本地双插拔接口与独立 Model ID；阶段 4 已将本地通道落地为 llama.cpp Android/JNI + GGUF，`ModelManager` 每次调用按网络动态路由 |
 | G3 | 云端树敏感判断被设计成"一律敏感"（一片大红） | **敏感判断与本地一致**：本地同步保留原判断（policyLevel 原值带入），云端创建按 `SecurityGate` + LLM 取并集判断；来源两分徽标（`CloudMemoryItemEntity.origin`：来自本地同步 / 云端创建，memoId 前缀计算属性，零迁移） |
 | G4 | 同步仅限"首次联网且云端树为空" | **每次 离线→在线 网络切换都自动拉取**：`MainActivity` 触发 `ensureCloudIntegrated()` → `autoIntegrateIfNeeded()`，与本地记忆「保密不迁移云端」选项联动（`cloudSyncCandidates` 按 `cloudEligible`/`policyLevel<2` 过滤，敏感/保密记忆永不外发） |
 | G5 | 云端树缺记忆添加入口（FAB） | 云端态 FAB 分支到 `showCloudAddDialog()` → `addToCloud`（云端创建，敏感判断与本地一致；断网返回 Unreachable 提示） |
@@ -107,10 +106,19 @@
 ## 版本状态记录
 
 - [x] **阶段 1 最小系统** — 2026-08-05 完成
-- [x] **阶段 1 评审修复 + 阶段 2 控制台完整版/检索/画像** — 2026-08-07 完成（分支 `api-key-warning`，未提交，等待手动 commit）
-- [x] **阶段 2 修复（网关双插拔/云树敏感判断与本地一致+来源两分/每次联网自动拉取/云树 FAB/断网锁屏遮罩/抽屉修复/mentor 替换/安全敏感日志/可视化导出）** — 2026-08-07 完成（提交 `8df81bd`）
-- [x] **阶段 3 vibe 三应用 + 系统 API 封装** — 2026-08-07 完成（分支 `phase3-dev`）
-- [ ] **阶段 4 进阶整合 + 演示打磨**
+- [x] **阶段 1 评审修复 + 阶段 2 控制台完整版/检索/画像** — 2026-08-07 完成（提交 `dfc08c1`）
+- [x] **阶段 2 修复（网关双插拔/云树敏感判断与本地一致+来源两分/每次联网自动拉取/云树 FAB/断网锁屏遮罩/抽屉修复/mentor 替换/安全敏感日志/可视化导出）** — 2026-08-07 已与阶段 3 安全整合（提交 `44fdd49`）
+- [x] **阶段 3 vibe 三应用 + 系统 API 封装** — 2026-08-07 已整合（提交 `44fdd49`）
+- [ ] **阶段 4 进阶整合 + 演示打磨**（端侧小模型组件已完成，其余阶段 4 内容待后续开发）
+
+## 阶段 4 已完成组件（2026-08-07）
+
+- **端侧推理 Runtime**：官方 llama.cpp Android/JNI，本轮按验收范围构建 x86_64 模拟器 ABI。
+- **轻量 Qwen**：运行时下载并校验 Qwen2.5-0.5B-Instruct Q4_K_M，不把约 469 MB GGUF 打进 APK。
+- **动态模型路由**：每次模型调用重新判断网络；在线走云端，离线只走本地端侧模型，不回退云端 HTTP。
+- **配置页双测试**：云端模型与端侧小模型提供并列、互不影响的连通测试按钮。
+- **本轮验收边界**：只验证离线状态下“本地树新增记忆 → 端侧模型结构化抽取 → 正常入库”。
+- 详细构建、模型版本和演示步骤见 `docs/阶段4端侧小模型说明.md`。
 
 ## 阶段 3 详细清单（2026-08-07）
 

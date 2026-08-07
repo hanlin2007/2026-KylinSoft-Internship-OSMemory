@@ -24,3 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "OS Memory"
 include(":app")
+include(":llama-runtime")

@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit
  * 云端大模型通道：OpenAI 兼容 Chat Completions（联网/内网 = "云端状态"时的默认通道）
  *
  * 网关语义（对齐产品设计）：联网/政企内网视为"云端状态"，使用更强的云端算力；
- * 与本地小模型通道共享 BaseURL/端点，仅 Model ID 不同（见 [ModelConfig.DEFAULT_LOCAL_MODEL]）。
+ * 与端侧通道共享 [ModelProvider] 业务接口；本类只负责 OpenAI 兼容 HTTP 端点。
  *
  * - 端点自动适配：{base}/chat/completions；当 base 不含 /v1 时，网关返回任意非 2xx 自动重试 {base}/v1/chat/completions
  *   （真实终端 https://api.ppio.com/openai/v1/chat/completions，base 已默认含 /v1，见 [ModelConfig]）
@@ -24,11 +24,21 @@ import java.util.concurrent.TimeUnit
  * - 每次调用上报 [ModelDiagnostics]，失败时带精确原因（网络异常 / HTTP 状态码+响应体 / 解析失败 / 超时）
  * - 回复经 JsonTools 健壮提取（容忍 markdown fence / 截断）
  */
-class CloudModelProvider(context: Context) : ModelProvider {
+class CloudModelProvider(
+    baseUrl: String,
+    model: String,
+    apiKey: String
+) : ModelProvider {
 
-    private val baseUrl = ModelConfig.baseUrl(context)
-    private val model = ModelConfig.model(context)
-    private val apiKey = ModelConfig.apiKey(context)
+    private val baseUrl = baseUrl.trim().trimEnd('/')
+    private val model = model.trim()
+    private val apiKey = apiKey.trim()
+
+    constructor(context: Context) : this(
+        ModelConfig.baseUrl(context),
+        ModelConfig.model(context),
+        ModelConfig.apiKey(context)
+    )
 
     override val name = "云端大模型（OpenAI 兼容 · $model）"
 

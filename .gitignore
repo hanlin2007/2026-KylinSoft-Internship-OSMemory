@@ -34,6 +34,7 @@ build/
 
 # Gradle files
 .gradle/
+.kotlin/
 build/
 gradle-appsetting.txt
 !gradle-wrapper.jar
@@ -83,3 +84,7 @@ firebase-debug.log
 .env
 .env.local
 .env.*.local
+
+# Local LLM weights (downloaded at runtime, never committed)
+*.gguf
+*.ggml

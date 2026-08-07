@@ -1,35 +1,88 @@
 package com.example.osmemory.core.model
 
 import android.content.Context
+import android.os.Build
+import com.arm.aichat.AiChat
+import com.arm.aichat.InferenceEngine
+import com.arm.aichat.isModelLoaded
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeout
 
-/**
- * 本地小模型通道：扩展点存根（离线/本地网关使用，阶段 4 启用）
- *
- * 【网关语义】联网/政企内网 = "云端状态"，走 [CloudModelProvider]（云端大模型，更强算力）；
- * 离线/本地网关时使用手机端部署的本地小模型——与云端共享 BaseURL/端点，仅 Model ID 不同
- * （见 [ModelConfig.DEFAULT_LOCAL_MODEL]），热插拔零业务改动。
- *
- * 【可行性结论】Android 上部署端侧小模型完全可行：
- *  1. llama.cpp Android（llama-android）：GGUF 格式，支持 1~4B 级量化模型，需 NDK 工具链；
- *  2. MLC-LLM：TFLite/Android 运行时，模型需提前转换；
- *  3. Termux + llama.cpp：快速试验路线（非原生）。
- * 代价：模型文件数百 MB~数 GB、推理速度受限、包体积膨胀。
- * 演示环境推荐云端通道（快、稳），本存根保证"统一接口 + 热插拔"。
- *
- * 启用路径：实现 [complete] 并让 [isAvailable] 返回 true（如检测到已下载的 GGUF 模型），
- * ModelManager 在离线时自动路由到本通道，业务代码零改动。
- */
-object LocalModelProvider : ModelProvider {
+/** llama.cpp Android/JNI 端侧通道；只在离线新增本地记忆的演示链路使用。 */
+class LocalModelProvider(context: Context) : ModelProvider {
+    private val appContext = context.applicationContext
+    private val inferenceMutex = Mutex()
 
-    override val name = "端侧小模型（本地网关 · ${ModelConfig.DEFAULT_LOCAL_MODEL}）"
+    override val name: String = "端侧小模型（llama.cpp · ${LocalModelSpec.DISPLAY_NAME}）"
 
-    fun isAvailable(context: Context): Boolean = false
+    fun isAvailable(): Boolean =
+        runtimeAbiSupported() && LocalModelStore.readyFile(appContext) != null
 
     override suspend fun complete(
         system: String,
         user: String,
         temperature: Double
-    ): String {
-        throw ModelException(ModelConfig.LOCAL_CHANNEL_DISABLED_REASON)
+    ): String = inferenceMutex.withLock {
+        val startedAt = System.currentTimeMillis()
+        try {
+            if (!runtimeAbiSupported()) {
+                throw ModelException("当前 ABI 不支持端侧模型：${Build.SUPPORTED_ABIS.joinToString()}")
+            }
+            val model = LocalModelStore.readyFile(appContext)
+                ?: throw ModelException("端侧模型尚未准备，请先在模型配置页点击“测试端侧模型”")
+            val engine = AiChat.getInferenceEngine(appContext)
+            awaitInitialized(engine)
+            if (engine.state.value.isModelLoaded || engine.state.value is InferenceEngine.State.Error) {
+                runCatching { engine.cleanUp() }
+            }
+            awaitInitialized(engine)
+            engine.loadModel(model.absolutePath)
+            engine.setSystemPrompt(system)
+            val reply = engine.sendUserPrompt(
+                message = "$user\n/no_think",
+                predictLength = MAX_PREDICT_TOKENS
+            ).toList().joinToString("").trim()
+            if (reply.isBlank()) throw ModelException("端侧模型返回空内容")
+
+            val duration = System.currentTimeMillis() - startedAt
+            ModelDiagnostics.success(name, duration)
+            reply
+        } catch (error: Throwable) {
+            val duration = System.currentTimeMillis() - startedAt
+            val message = error.message ?: error.javaClass.simpleName
+            ModelDiagnostics.failure(name, message, duration)
+            throw if (error is ModelException) error
+            else ModelException("端侧模型调用失败：$message", error)
+        } finally {
+            runCatching {
+                val engine = AiChat.getInferenceEngine(appContext)
+                if (engine.state.value.isModelLoaded || engine.state.value is InferenceEngine.State.Error) {
+                    engine.cleanUp()
+                }
+            }
+        }
+    }
+
+    private suspend fun awaitInitialized(engine: InferenceEngine) {
+        val state = withTimeout(30_000L) {
+            engine.state.first {
+                it !is InferenceEngine.State.Uninitialized &&
+                    it !is InferenceEngine.State.Initializing &&
+                    it !is InferenceEngine.State.LoadingModel &&
+                    it !is InferenceEngine.State.UnloadingModel
+            }
+        }
+        if (state is InferenceEngine.State.Error) {
+            runCatching { engine.cleanUp() }
+        }
+    }
+
+    companion object {
+        private const val MAX_PREDICT_TOKENS = 384
+
+        fun runtimeAbiSupported(): Boolean = Build.SUPPORTED_ABIS.any { it == "x86_64" }
     }
 }

@@ -37,7 +37,8 @@ object NetworkMonitor {
         Handler(Looper.getMainLooper()).post {
             cm.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
-                    _online.value = true
+                    // onAvailable 只代表网络对象出现；是否真正可用仍以能力校验为准。
+                    _online.value = isOnline(cm)
                 }
 
                 override fun onLost(network: Network) {

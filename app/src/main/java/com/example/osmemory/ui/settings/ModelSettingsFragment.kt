@@ -12,20 +12,16 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.example.osmemory.R
+import com.example.osmemory.core.model.LocalModelSpec
+import com.example.osmemory.core.model.LocalModelStore
 import com.example.osmemory.core.model.ModelConfig
 import com.example.osmemory.data.MemoryService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/**
- * 模型设置页（阶段 2 + 阶段 2 修复）：修改 Base URL / 云端模型 / 本地模型 / API Key，测试连接，保存即热插拔。
- *
- * 网关语义：云端大模型（联网/内网 = 云端状态）+ 本地小模型（离线/本地网关）双插拔接口，
- * 两者共享 BaseURL 与端点，仅 Model ID 不同。
- * 降级可观测：测试结果直接展示"成功/失败 + 具体原因"（网络/HTTP/解析），
- * 保存后 ModelManager.reset() 重建通道，业务代码零改动。
- */
+/** 云端与端侧模型并列配置、并列连通测试。 */
 class ModelSettingsFragment : Fragment() {
 
     override fun onCreateView(
@@ -37,85 +33,163 @@ class ModelSettingsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         val context = requireContext()
-
         val etBaseUrl = view.findViewById<EditText>(R.id.etBaseUrl)
         val etModel = view.findViewById<EditText>(R.id.etModel)
         val etLocalModel = view.findViewById<EditText>(R.id.etLocalModel)
         val etApiKey = view.findViewById<EditText>(R.id.etApiKey)
 
-        // 回填当前配置
         etBaseUrl.setText(ModelConfig.baseUrl(context))
         etModel.setText(ModelConfig.model(context))
-        etLocalModel.setText(ModelConfig.localModel(context))
+        etLocalModel.setText(LocalModelSpec.ID)
         etApiKey.setText(ModelConfig.apiKey(context))
+        renderLocalStatus(view)
 
-        view.findViewById<TextView>(R.id.btnTest).setOnClickListener {
-            testConnection(etBaseUrl, etModel, etApiKey, view)
+        view.findViewById<TextView>(R.id.btnTestCloud).setOnClickListener {
+            testCloud(etBaseUrl, etModel, etApiKey, view)
+        }
+        view.findViewById<TextView>(R.id.btnTestLocal).setOnClickListener {
+            testLocal(view)
         }
         view.findViewById<TextView>(R.id.btnSave).setOnClickListener {
-            save(etBaseUrl, etModel, etLocalModel, etApiKey, view)
+            save(etBaseUrl, etModel, etLocalModel, etApiKey)
         }
     }
 
-    private fun testConnection(
-        etBaseUrl: EditText, etModel: EditText, etApiKey: EditText, root: View
+    private fun testCloud(
+        etBaseUrl: EditText,
+        etModel: EditText,
+        etApiKey: EditText,
+        root: View
     ) {
         val baseUrl = etBaseUrl.text?.toString()?.trim().orEmpty()
         val model = etModel.text?.toString()?.trim().orEmpty()
         val apiKey = etApiKey.text?.toString()?.trim().orEmpty()
         if (baseUrl.isEmpty() || model.isEmpty() || apiKey.isEmpty()) {
-            toast("Base URL / 模型 / API Key 不能为空")
+            toast("Base URL / 云端模型 / API Key 不能为空")
             return
         }
-        val tvResult = root.findViewById<TextView>(R.id.tvTestResult)
-        tvResult.isVisible = true
-        tvResult.text = "正在测试连接…（${baseUrl.trimEnd('/')}/chat/completions）"
-        tvResult.setTextColor(ContextCompat.getColor(requireContext(), R.color.semantic_public))
+        val resultView = root.findViewById<TextView>(R.id.tvCloudTestResult)
+        resultView.showInfo("正在测试云端模型…")
 
         viewLifecycleOwner.lifecycleScope.launch {
-            // 先临时保存，让 provider 用新配置测试；失败/成功都展示原因
-            withContext(Dispatchers.IO) {
-                MemoryService.repo(requireContext()).saveModelConfig(baseUrl, model, apiKey)
-            }
             val record = withContext(Dispatchers.IO) {
-                MemoryService.repo(requireContext()).testModelConnection()
+                MemoryService.repo(requireContext()).testCloudConnection(baseUrl, model, apiKey)
             }
-            tvResult.text = buildString {
-                append("测试结果：")
-                if (record.ok) append("成功（${record.durationMs}ms）· ${record.channel}")
-                else append("失败 → ${record.message}")
+            resultView.showRecord(record.ok, record.durationMs, record.channel, record.message)
+        }
+    }
+
+    private fun testLocal(root: View) {
+        val button = root.findViewById<TextView>(R.id.btnTestLocal)
+        val resultView = root.findViewById<TextView>(R.id.tvLocalTestResult)
+        button.isEnabled = false
+        resultView.showInfo("正在准备端侧模型…首次使用会下载约 469 MB")
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    LocalModelStore.ensureReady(requireContext()) { progress ->
+                        val percent = if (progress.total > 0L) {
+                            (progress.downloaded * 100L / progress.total).coerceIn(0L, 100L)
+                        } else 0L
+                        resultView.post {
+                            if (isAdded && view === root) {
+                                resultView.showInfo("正在下载并校验端侧模型…$percent%")
+                            }
+                        }
+                    }
+                }
+                if (!isAdded || view !== root) return@launch
+                renderLocalStatus(root)
+                resultView.showInfo("模型已校验，正在由 llama.cpp 加载并生成…")
+                val record = withContext(Dispatchers.IO) {
+                    MemoryService.repo(requireContext()).testLocalConnection()
+                }
+                resultView.showRecord(record.ok, record.durationMs, record.channel, record.message)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                if (isAdded && view === root) {
+                    resultView.showRecord(
+                        ok = false,
+                        durationMs = 0L,
+                        channel = "端侧小模型",
+                        message = error.message ?: error.javaClass.simpleName
+                    )
+                }
+            } finally {
+                if (isAdded && view === root) {
+                    button.isEnabled = true
+                    renderLocalStatus(root)
+                }
             }
-            tvResult.setTextColor(
+        }
+    }
+
+    private fun renderLocalStatus(root: View) {
+        val status = LocalModelStore.status(requireContext())
+        root.findViewById<TextView>(R.id.tvLocalModelStatus).apply {
+            text = "${LocalModelSpec.DISPLAY_NAME} · ${status.message}"
+            setTextColor(
                 ContextCompat.getColor(
                     requireContext(),
-                    if (record.ok) R.color.semantic_normal else R.color.semantic_sensitive
+                    if (status.ready) R.color.semantic_normal else R.color.semantic_public
                 )
             )
         }
     }
 
     private fun save(
-        etBaseUrl: EditText, etModel: EditText, etLocalModel: EditText, etApiKey: EditText, root: View
+        etBaseUrl: EditText,
+        etModel: EditText,
+        etLocalModel: EditText,
+        etApiKey: EditText
     ) {
         val baseUrl = etBaseUrl.text?.toString()?.trim().orEmpty()
         val model = etModel.text?.toString()?.trim().orEmpty()
         val localModel = etLocalModel.text?.toString()?.trim().orEmpty()
         val apiKey = etApiKey.text?.toString()?.trim().orEmpty()
         if (baseUrl.isEmpty() || model.isEmpty() || apiKey.isEmpty()) {
-            toast("Base URL / 模型 / API Key 不能为空")
+            toast("Base URL / 云端模型 / API Key 不能为空")
             return
         }
         MemoryService.repo(requireContext()).saveModelConfig(
             baseUrl = baseUrl,
             model = model,
             apiKey = apiKey,
-            localModel = localModel
+            localModel = localModel.ifBlank { LocalModelSpec.ID }
         )
-        toast("已保存并热插拔模型通道：云端 $model · 本地 $localModel")
+        toast("模型配置已保存：在线走云端，离线走端侧 Qwen")
     }
 
-    private fun toast(msg: String) {
-        Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
+    private fun TextView.showInfo(message: String) {
+        isVisible = true
+        text = message
+        setTextColor(ContextCompat.getColor(requireContext(), R.color.semantic_public))
+    }
+
+    private fun TextView.showRecord(
+        ok: Boolean,
+        durationMs: Long,
+        channel: String,
+        message: String
+    ) {
+        isVisible = true
+        text = if (ok) {
+            "测试成功（${durationMs}ms）· $channel"
+        } else {
+            "测试失败 · $message"
+        }
+        setTextColor(
+            ContextCompat.getColor(
+                requireContext(),
+                if (ok) R.color.semantic_normal else R.color.semantic_sensitive
+            )
+        )
+    }
+
+    private fun toast(message: String) {
+        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
     }
 
     companion object {

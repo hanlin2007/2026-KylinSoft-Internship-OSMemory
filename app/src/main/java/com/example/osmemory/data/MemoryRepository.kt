@@ -2,6 +2,7 @@ package com.example.osmemory.data
 
 import android.content.Context
 import com.example.osmemory.core.model.ModelConfig
+import com.example.osmemory.core.model.CloudModelProvider
 import com.example.osmemory.core.model.ModelDiagnostics
 import com.example.osmemory.core.model.ModelManager
 import com.example.osmemory.core.model.ModelProvider
@@ -28,7 +29,8 @@ import kotlinx.coroutines.flow.StateFlow
  * 阶段 3：本类方法被 vibe 三应用（记事本/对话问答/文件分类器）直接调用；
  * 阶段 4：包装为 Binder/AIDL 跨进程服务，接口不变。
  */
-class MemoryRepository(private val context: Context) {
+class MemoryRepository(context: Context) {
+    private val context = context.applicationContext
 
     private val db = OSMemoryDatabase.get(context)
     private val cloudDb = CloudTreeDatabase.get(context)
@@ -176,21 +178,52 @@ class MemoryRepository(private val context: Context) {
         refreshChannels()
     }
 
-    /** 设置页"测试连接"：向模型发一条最小请求，返回诊断记录（不经业务流水线） */
-    suspend fun testModelConnection(): ModelDiagnostics.CallRecord {
-        val current = provider
+    /** 云端按钮：直接测试输入框中的配置，不改变当前已保存设置。 */
+    suspend fun testCloudConnection(
+        baseUrl: String,
+        model: String,
+        apiKey: String
+    ): ModelDiagnostics.CallRecord = testProvider(
+        CloudModelProvider(baseUrl, model, apiKey),
+        "你是云端模型连通性测试。",
+        "请只回复 OK。"
+    )
+
+    /** 端侧按钮：绕过网络路由，直接完成一次本机 llama.cpp 推理。 */
+    suspend fun testLocalConnection(): ModelDiagnostics.CallRecord = testProvider(
+        ModelManager.localProvider(context),
+        "你是端侧模型连通性测试。请简短回答。",
+        "请只回复：端侧模型正常。"
+    )
+
+    private suspend fun testProvider(
+        current: ModelProvider,
+        system: String,
+        user: String
+    ): ModelDiagnostics.CallRecord {
+        val startedAt = System.currentTimeMillis()
         return try {
-            current.complete("你是连通性测试。", "请回复 OK。", 0.0)
+            current.complete(system, user, 0.0)
             ModelDiagnostics.lastCall.value ?: ModelDiagnostics.CallRecord(
-                current.name, ok = true, "调用成功", System.currentTimeMillis(), 0
+                current.name,
+                ok = true,
+                "调用成功",
+                System.currentTimeMillis(),
+                System.currentTimeMillis() - startedAt
             )
         } catch (e: Exception) {
-            // CloudModelProvider 已写入诊断，兜底再写一次
-            val rec = ModelDiagnostics.lastCall.value
+            val rec = ModelDiagnostics.lastCall.value?.takeIf { it.channel == current.name }
             if (rec == null) {
                 val now = System.currentTimeMillis()
-                val r = ModelDiagnostics.CallRecord(current.name, false, e.message ?: "未知错误", now, 0)
-                ModelDiagnostics.failure(current.name, r.message, 0)
+                val duration = now - startedAt
+                val r = ModelDiagnostics.CallRecord(
+                    current.name,
+                    false,
+                    e.message ?: "未知错误",
+                    now,
+                    duration
+                )
+                ModelDiagnostics.failure(current.name, r.message, duration)
                 r
             } else rec
         }
@@ -239,6 +272,6 @@ object MemoryService {
 
     fun repo(context: Context): MemoryRepository =
         repository ?: synchronized(this) {
-            MemoryRepository(context).also { repository = it }
+            MemoryRepository(context.applicationContext).also { repository = it }
         }
 }
