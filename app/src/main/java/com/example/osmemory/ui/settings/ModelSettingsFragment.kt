@@ -53,6 +53,24 @@ class ModelSettingsFragment : Fragment() {
         view.findViewById<TextView>(R.id.btnSave).setOnClickListener {
             save(etBaseUrl, etModel, etLocalModel, etApiKey)
         }
+
+        // 首次启动自动下载进度（后台触发）；下载完成自动刷新状态行
+        viewLifecycleOwner.lifecycleScope.launch {
+            MemoryService.repo(requireContext()).observeLocalModelDownload().collect { progress ->
+                if (progress == null) {
+                    if (isAdded) renderLocalStatus(view)
+                } else {
+                    val percent = if (progress.total > 0L) {
+                        (progress.downloaded * 100L / progress.total).coerceIn(0L, 100L)
+                    } else 0L
+                    view.findViewById<TextView>(R.id.tvLocalTestResult).apply {
+                        isVisible = true
+                        text = "正在后台自动下载端侧模型…$percent%（下载完成后即可离线使用）"
+                        setTextColor(ContextCompat.getColor(requireContext(), R.color.semantic_public))
+                    }
+                }
+            }
+        }
     }
 
     private fun testCloud(

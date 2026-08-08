@@ -6,8 +6,9 @@ import com.example.osmemory.core.dream.DreamEngine
 import com.example.osmemory.core.dream.DreamReport
 import com.example.osmemory.core.dream.DreamScheduler
 import com.example.osmemory.core.dream.LocalTreeOps
-import com.example.osmemory.core.model.ModelConfig
 import com.example.osmemory.core.model.CloudModelProvider
+import com.example.osmemory.core.model.LocalModelStore
+import com.example.osmemory.core.model.ModelConfig
 import com.example.osmemory.core.model.ModelDiagnostics
 import com.example.osmemory.core.model.ModelManager
 import com.example.osmemory.core.model.ModelProvider
@@ -23,9 +24,14 @@ import com.example.osmemory.data.db.OSMemoryDatabase
 import com.example.osmemory.data.db.entity.MemoryItemEntity
 import com.example.osmemory.data.db.entity.MemoryLogEntity
 import com.example.osmemory.data.db.entity.RegisteredAppEntity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * 数据门面（进程内"系统 API"形态，对应 PPT memo_collect / get_memo）
@@ -60,10 +66,44 @@ class MemoryRepository(context: Context) {
     private val _lastProfile = MutableStateFlow<ProfileBuilder.ProfileResult?>(null)
     private val _lastDream = MutableStateFlow<DreamReport?>(null)
 
+    /** 端侧模型后台自动下载进度（首次启动触发；设置页实时展示） */
+    private val _localModelDownload = MutableStateFlow<LocalModelStore.Progress?>(null)
+
+    /** 后台任务（自动下载等）用进程级 scope；下载完成即置 null */
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** 每次进程启动只尝试一次自动下载（失败不重试，可用"测试端侧模型"手动重试） */
+    private val localModelAutoDownloadAttempted = AtomicBoolean(false)
+
     init {
         NetworkMonitor.init(context)
         refreshChannels()
+        autoDownloadLocalModelIfNeeded()
     }
+
+    /**
+     * 首次启动自动触发端侧模型下载（新手机装完即用，无需手动安装）。
+     * 仅在线且模型未就绪时启动；进度经 [observeLocalModelDownload] 暴露给设置页。
+     */
+    private fun autoDownloadLocalModelIfNeeded() {
+        if (!localModelAutoDownloadAttempted.compareAndSet(false, true)) return
+        appScope.launch {
+            try {
+                if (LocalModelStore.readyFile(context) != null) return@launch
+                if (!NetworkMonitor.isOnline(context)) return@launch
+                LocalModelStore.ensureReady(context) { progress ->
+                    _localModelDownload.value = progress
+                }
+                _localModelDownload.value = null
+            } catch (_: Exception) {
+                // 下载失败（网络中断/校验失败）：置 null 恢复状态行展示，用户可点"测试端侧模型"重试
+                _localModelDownload.value = null
+            }
+        }
+    }
+
+    /** 端侧模型自动下载进度（null = 未在下载） */
+    fun observeLocalModelDownload(): StateFlow<LocalModelStore.Progress?> = _localModelDownload
 
     /** 模型/网络配置变更后重建通道依赖（provider 热插拔） */
     fun refreshChannels() {

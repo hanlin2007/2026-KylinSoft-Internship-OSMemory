@@ -109,8 +109,10 @@ class ProfileFragment : Fragment() {
         overlay.alpha = 1f
         overlay.isVisible = true
         if (content != null && Build.VERSION.SDK_INT >= 31) {
-            content.renderEffect = android.graphics.RenderEffect.createBlurEffect(
-                16f, 16f, android.graphics.Shader.TileMode.CLAMP
+            content.setRenderEffect(
+                android.graphics.RenderEffect.createBlurEffect(
+                    16f, 16f, android.graphics.Shader.TileMode.CLAMP
+                )
             )
         }
     }
@@ -143,7 +145,7 @@ class ProfileFragment : Fragment() {
                         .withEndAction {
                             overlay.isVisible = false
                             if (content != null && Build.VERSION.SDK_INT >= 31) {
-                                content.renderEffect = null
+                                content.setRenderEffect(null)
                             }
                             sweepPlaying = false
                         }

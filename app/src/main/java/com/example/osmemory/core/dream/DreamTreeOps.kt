@@ -3,6 +3,7 @@ package com.example.osmemory.core.dream
 import com.example.osmemory.data.cloud.CloudMemoryItemDao
 import com.example.osmemory.data.cloud.CloudMemoryItemEntity
 import com.example.osmemory.data.db.dao.MemoryItemDao
+import com.example.osmemory.data.db.dao.MemoryLogDao
 import com.example.osmemory.data.db.entity.MemoryItemEntity
 import com.example.osmemory.data.db.entity.MemoryLogEntity
 import com.example.osmemory.core.pipeline.MemoryPipeline.Companion.LOG_SECURITY

@@ -14,6 +14,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.osmemory.R
@@ -66,6 +67,9 @@ class ChatActivity : AppCompatActivity() {
         findViewById<Button>(R.id.p3_chat_settings).setOnClickListener {
             startActivity(Intent(this, ChatSettingsActivity::class.java))
         }
+        findViewById<TextView>(R.id.p3_chat_project_memory_clear).setOnClickListener {
+            confirmClearProjectMemories()
+        }
         sendButton.setOnClickListener { submitQuestion() }
         input.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) {
@@ -101,6 +105,27 @@ class ChatActivity : AppCompatActivity() {
             if (memoryEnabled) Color.rgb(27, 94, 32) else Color.rgb(97, 97, 97)
         )
         if (memoryEnabled) retryPendingMemories()
+        // 从设置页清空记忆后返回时刷新面板
+        renderProjectMemories()
+    }
+
+    /** 清空记忆面板：二次确认后清空项目/会话记忆并立即重绘（OS Memory 系统级副本不受影响） */
+    private fun confirmClearProjectMemories() {
+        val count = chatMemoryStore.all().size
+        if (count == 0) {
+            Toast.makeText(this, "记忆面板已经是空的", Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("清空项目/会话记忆")
+            .setMessage("将清除面板中的 $count 条对话提炼记忆。已同步到 OS Memory 的系统级副本不受影响。")
+            .setPositiveButton("清空") { _, _ ->
+                val cleared = chatMemoryStore.clear()
+                renderProjectMemories()
+                Toast.makeText(this, "已清空 $cleared 条对话记忆", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun submitQuestion() {
@@ -345,6 +370,8 @@ class ChatActivity : AppCompatActivity() {
                 }
             })
         }
+        // 同步成功后刷新面板，让"正在同步"立刻变为"已同步"
+        renderProjectMemories()
         projectMemoryScroll.post { projectMemoryScroll.fullScroll(View.FOCUS_DOWN) }
     }
 

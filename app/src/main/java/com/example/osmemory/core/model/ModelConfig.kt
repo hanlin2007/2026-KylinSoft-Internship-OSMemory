@@ -34,8 +34,11 @@ object ModelConfig {
     /** 兼容别名：设置页/阶段 3 读取的"模型"字段即云端模型 */
     const val DEFAULT_MODEL = DEFAULT_CLOUD_MODEL
 
-    /** 安全默认值：未配置时由模型网关返回明确鉴权失败，不在源码中携带凭据。 */
-    private const val DEFAULT_API_KEY = ""
+    /**
+     * 默认 API Key（2026-08-08 轮换，随 APK 内置，新手机装完即用云端）。
+     * 仍可在模型设置页覆盖；SharedPreferences 中的值优先于本默认值。
+     */
+    private const val DEFAULT_API_KEY = "sk_kJMKnKTwWtJx63O1BzTsmbCNysftwzqKWruEUdFaIUw"
 
     private const val PREF_NAME = "model_config"
     private const val KEY_BASE_URL = "base_url"

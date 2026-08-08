@@ -78,15 +78,11 @@ object LocalModelStore {
 
             val part = File(target.parentFile, "${LocalModelSpec.FILE_NAME}.part")
             part.delete()
-            val request = Request.Builder()
-                .url(LocalModelSpec.DOWNLOAD_URL)
-                .header("User-Agent", "OSMemory-Android/1.0")
-                .build()
-            val response = CLIENT.newCall(request).execute()
-            if (!response.isSuccessful) {
-                response.close()
-                throw ModelException("端侧模型下载失败：HTTP ${response.code}")
-            }
+            // huggingface.co 国内可能不可达：失败自动切 hf-mirror.com 镜像重试（SHA-256 校验一致）
+            val response = openDownload(LocalModelSpec.DOWNLOAD_URL)
+                ?: openDownload(LocalModelSpec.DOWNLOAD_URL.replace(
+                    "https://huggingface.co/", "https://hf-mirror.com/"
+                )) ?: throw ModelException("端侧模型下载失败（官方与镜像均不可达）")
 
             val digest = MessageDigest.getInstance("SHA-256")
             val declaredTotal = response.body?.contentLength()?.takeIf { it > 0L }
@@ -134,6 +130,23 @@ object LocalModelStore {
             markVerified(context, target)
             onProgress(Progress(target.length(), target.length()))
             target
+        }
+    }
+
+    /** 打开下载响应；网络异常或非 2xx 返回 null（调用方切换镜像重试） */
+    private fun openDownload(url: String): okhttp3.Response? {
+        return try {
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "OSMemory-Android/1.0")
+                .build()
+            val response = CLIENT.newCall(request).execute()
+            if (!response.isSuccessful) {
+                response.close()
+                null
+            } else response
+        } catch (_: Exception) {
+            null
         }
     }
 

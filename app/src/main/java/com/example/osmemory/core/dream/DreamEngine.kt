@@ -45,6 +45,9 @@ class DreamEngine(
         const val DEDUP_SIMILARITY = 0.88f
 
         private const val CONSOLE_APP_ID = "osmemory_console"
+
+        /** LLM 候选对上限（防止长库把 prompt 撑爆） */
+        private const val MAX_LLM_CANDIDATES = 30
     }
 
     /** 一次 Dream（四步整合），永远不抛出；任何异常 → 降级报告 + DREAM 日志 */
@@ -417,9 +420,4 @@ class DreamEngine(
         if (existing.isBlank()) part else "$existing；$part"
 
     private data class ArchivePlan(val archived: List<Pair<DreamItem, String>>)
-
-    private companion object {
-        /** LLM 候选对上限（防止长库把 prompt 撑爆） */
-        const val MAX_LLM_CANDIDATES = 30
-    }
 }
