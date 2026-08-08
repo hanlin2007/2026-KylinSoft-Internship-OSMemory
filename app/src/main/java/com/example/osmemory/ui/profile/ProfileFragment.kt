@@ -86,18 +86,34 @@ class ProfileFragment : Fragment() {
         pb?.isVisible = true
         viewLifecycleOwner.lifecycleScope.launch {
             if (sweep) showSweepOverlay(root)
-            val result = withContext(Dispatchers.IO) { repo.buildProfile() }
-            pb?.isVisible = false
-            render(root, result)
-            if (sweep) playSweepAnimation(root)
-            if (!isAdded) return@launch
-            Toast.makeText(
-                requireContext(),
-                if (result.degraded) "画像已刷新（统计降级：${result.reason.take(40)}）"
-                else "画像已刷新（LLM 三板块）",
-                Toast.LENGTH_SHORT
-            ).show()
+            try {
+                val result = withContext(Dispatchers.IO) { repo.buildProfile() }
+                pb?.isVisible = false
+                render(root, result)
+                if (sweep) playSweepAnimation(root)
+                if (!isAdded) return@launch
+                Toast.makeText(
+                    requireContext(),
+                    if (result.degraded) "画像已刷新（统计降级：${result.reason.take(40)}）"
+                    else "画像已刷新（LLM 三板块）",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } catch (error: Throwable) {
+                // 画像聚合失败（含模型异常/OOM）：降级显示原因，绝不闪退
+                pb?.isVisible = false
+                if (sweep) playSweepAnimation(root)
+                if (!isAdded) return@launch
+                val message = error.message ?: error.javaClass.simpleName
+                renderPlaceholder(root, "画像生成失败（$message）")
+            }
         }
+    }
+
+    /** 画像失败占位：三板块保留上次内容，状态行显示失败原因（可审计） */
+    private fun renderPlaceholder(root: View, message: String) {
+        val tvStatus = root.findViewById<TextView>(R.id.tvProfileStatus)
+        tvStatus.text = "$message · 可稍后点「重新生成」重试"
+        tvStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.semantic_sensitive))
     }
 
     // ---------- AutoDream 虚化刷过动画 ----------

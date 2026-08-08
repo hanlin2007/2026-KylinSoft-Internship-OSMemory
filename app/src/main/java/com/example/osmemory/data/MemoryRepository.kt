@@ -7,6 +7,7 @@ import com.example.osmemory.core.dream.DreamReport
 import com.example.osmemory.core.dream.DreamScheduler
 import com.example.osmemory.core.dream.LocalTreeOps
 import com.example.osmemory.core.model.CloudModelProvider
+import com.example.osmemory.core.model.LocalModelProvider
 import com.example.osmemory.core.model.LocalModelStore
 import com.example.osmemory.core.model.ModelConfig
 import com.example.osmemory.core.model.ModelDiagnostics
@@ -165,11 +166,56 @@ class MemoryRepository(context: Context) {
 
     // ---------- AutoDream（阶段 4：记忆自进化） ----------
 
-    /** 立即对本地树做一次 Dream（端侧算力；手动触发/离线周期用） */
+    /**
+     * 立即对本地树做一次 Dream（端侧算力；手动触发/离线周期用）。
+     *
+     * 守卫：端侧模型未就绪（ABI 不支持 / GGUF 未下载校验）时**跳过**本轮，
+     * 不触发 llama.cpp 加载——469MB 模型加载需 1.5-2GB 内存，模拟器上
+     * 强行加载会 OOM 崩溃（OutOfMemoryError 抓不住 Exception，直接杀进程）。
+     * 跳过不等于失败：不参与调度器退避，模型就绪后下轮自然恢复。
+     */
     suspend fun dreamLocalNow(): DreamReport {
-        val report = localDreamEngine.dream(online = NetworkMonitor.isOnline(context))
+        val local = ModelManager.localProvider(context)
+        val online = NetworkMonitor.isOnline(context)
+        val skip = skipLocalDreamReason(local)
+        if (skip != null) {
+            val report = DreamReport(
+                tree = "LOCAL",
+                online = online,
+                conflictsResolved = 0,
+                splitCount = 0,
+                mergedCount = 0,
+                distilledCount = 0,
+                archivedCount = 0,
+                message = "本地树 Dream 跳过：$skip（就绪后自动恢复整合）",
+                degraded = false,
+                reason = skip,
+                at = System.currentTimeMillis()
+            )
+            _lastDream.value = report
+            return report
+        }
+        val report = localDreamEngine.dream(online = online)
         _lastDream.value = report
         return report
+    }
+
+    /**
+     * 本地 Dream 跳过的原因；null 表示可执行。
+     * ① 端侧模型未就绪（ABI / GGUF 未下载校验）；
+     * ② 可用内存不足 [MIN_FREE_MEMORY_FOR_LOCAL_DREAM]——469MB GGUF 加载需 ~1.5-2GB，
+     *    低内存设备强行加载会 OOM 崩溃（Error 抓不住 Exception 直接杀进程）。
+     */
+    private fun skipLocalDreamReason(local: LocalModelProvider): String? {
+        if (!local.isAvailable()) return "端侧模型未就绪（联网后自动下载）"
+        val memoryInfo = android.app.ActivityManager.MemoryInfo()
+        (context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager)
+            ?.getMemoryInfo(memoryInfo)
+        if (memoryInfo.availMem < MIN_FREE_MEMORY_FOR_LOCAL_DREAM) {
+            val freeGb = "%.1f".format(memoryInfo.availMem / 1024.0 / 1024.0 / 1024.0)
+            return "可用内存不足（$freeGb GB），端侧模型暂不加载"
+        }
+        return null
     }
 
     /** 立即对云端树做一次 Dream（云端算力；整合结果不脱离云端树）。离线时不可达，返回 null。 */
@@ -368,6 +414,11 @@ class MemoryRepository(context: Context) {
         itemDao.deleteAll()
         cloudDao.deleteAll()
         logDao.deleteAll()
+    }
+
+    private companion object {
+        /** 本地 Dream 最低可用内存：469MB GGUF 加载峰值约需 1.5-2GB，低内存跳过防 OOM */
+        const val MIN_FREE_MEMORY_FOR_LOCAL_DREAM = 1_200L * 1024 * 1024
     }
 }
 

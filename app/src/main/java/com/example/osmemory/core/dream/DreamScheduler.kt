@@ -1,6 +1,7 @@
 package com.example.osmemory.core.dream
 
 import android.content.Context
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,7 +32,13 @@ class DreamScheduler(
     private val dreamCloud: suspend () -> DreamReport?,
     private val isOnline: () -> Boolean
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    /**
+     * 后台整合永不崩进程：任何未捕获异常（含 OOM 等 Error）只被吞掉记录，
+     * 绝不走默认 handler 杀进程（本地模型加载失败/内存压力时兜底关键）。
+     */
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, _ -> }
+    )
     private val lock = AtomicBoolean(false)
     private val lastCloudDreamAt = AtomicLong(0)
 
@@ -90,7 +97,7 @@ class DreamScheduler(
             } finally {
                 lock.set(false)
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) { // 含 OOM/StackOverflow 等 Error：降级为失败并退避，不崩进程
             false
         }
     }
@@ -104,7 +111,7 @@ class DreamScheduler(
             } finally {
                 lock.set(false)
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             false
         }
     }

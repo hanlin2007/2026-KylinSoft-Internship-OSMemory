@@ -195,7 +195,7 @@ class ChatActivity : AppCompatActivity() {
                         syncMemory(localRecord)
                     }
                 }
-            } catch (error: Exception) {
+            } catch (error: Throwable) {
                 if (useMemoryForTurn) {
                     runCatching {
                         memoryApi.recordInference(
@@ -207,6 +207,7 @@ class ChatActivity : AppCompatActivity() {
                         )
                     }
                 }
+                // Throwable：模型异常/OOM 等 Error 也转为错误气泡，绝不闪退
                 appendErrorMessage(error.message ?: "模型调用失败，请稍后重试")
             } finally {
                 setSending(false)
@@ -227,14 +228,16 @@ class ChatActivity : AppCompatActivity() {
                     is MemoCollectResult.Rejected ->
                         chatMemoryStore.markFailed(record.localId, result.reason)
                 }
-            } catch (error: Exception) {
-                chatMemoryStore.markFailed(
-                    record.localId,
-                    error.message ?: error.javaClass.simpleName
-                )
+            } catch (error: Throwable) {
+                runCatching {
+                    chatMemoryStore.markFailed(
+                        record.localId,
+                        error.message ?: error.javaClass.simpleName
+                    )
+                }
             } finally {
                 syncingLocalIds.remove(record.localId)
-                renderProjectMemories()
+                runCatching { renderProjectMemories() }
             }
         }
     }
