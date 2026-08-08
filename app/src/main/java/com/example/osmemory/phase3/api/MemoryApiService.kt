@@ -145,6 +145,7 @@ class MemoryApiClient internal constructor(
         val now = System.currentTimeMillis()
         val items = itemDao.allItems()
             .asSequence()
+            .filter { it.dreamState == 0 }
             .filter { it.policyLevel <= NORMAL_APP_POLICY_MAX }
             .filter { it.expiresAt == null || it.expiresAt > now }
             .sortedByDescending { it.updatedAt }

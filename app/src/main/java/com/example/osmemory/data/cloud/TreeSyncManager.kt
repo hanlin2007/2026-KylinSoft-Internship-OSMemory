@@ -67,6 +67,11 @@ class TreeSyncManager(
     /** 最近一次同步/整合结果（null = 尚未执行） */
     val lastSync: StateFlow<SyncReport?> = _lastSync
 
+    /** 清空演示数据时同步清除进程内结果，避免页面继续展示上一轮状态。 */
+    fun resetLastSync() {
+        _lastSync.value = null
+    }
+
     /**
      * 联网自动拉取（每次 离线→在线 网络切换时由 MainActivity 触发）：
      * 把本地"允许上云且待同步"的记忆拉取到云端树（敏感/保密记忆由 cloudEligible 标签隔离，永不外发）。
@@ -97,6 +102,7 @@ class TreeSyncManager(
         for (item in candidates) {
             // 保密隔离双保险：查询已过滤 cloudEligible=false / 敏感项，这里再拦（防御性）
             if (!item.cloudEligible || item.policyLevel >= 2) continue
+            val cloudMergedInto = cloudSafeMergedInto(item.mergedInto)
             cloudDao.upsert(
                 CloudMemoryItemEntity(
                     memoId = item.memoId,
@@ -111,7 +117,9 @@ class TreeSyncManager(
                     createdAt = item.createdAt,
                     updatedAt = item.updatedAt,
                     evidenceRaw = item.evidenceRaw,
-                    syncedAt = now
+                    syncedAt = now,
+                    dreamState = item.dreamState,
+                    mergedInto = cloudMergedInto
                 )
             )
             itemDao.markSynced(item.id, now)
@@ -180,6 +188,7 @@ class TreeSyncManager(
                 continue
             }
             try {
+                val cloudMergedInto = cloudSafeMergedInto(item.mergedInto)
                 cloudDao.upsert(
                     CloudMemoryItemEntity(
                         memoId = item.memoId,
@@ -194,7 +203,9 @@ class TreeSyncManager(
                         createdAt = item.createdAt,
                         updatedAt = item.updatedAt,
                         evidenceRaw = item.evidenceRaw,
-                        syncedAt = now
+                        syncedAt = now,
+                        dreamState = item.dreamState,
+                        mergedInto = cloudMergedInto
                     )
                 )
                 itemDao.markSynced(item.id, now)
@@ -340,6 +351,16 @@ class TreeSyncManager(
 
     private fun report(online: Boolean, pushed: Int, skipped: Int, message: String, at: Long) =
         SyncReport(online = online, pushed = pushed, skipped = skipped, message = message, at = at)
+
+    /**
+     * 本地归档项可能指向一条敏感 keeper。归档状态可以同步，但敏感记忆的 memoId
+     * 不能作为 mergedInto 元数据外发，也不能在云端留下悬空引用。
+     */
+    private suspend fun cloudSafeMergedInto(mergedInto: String): String {
+        if (mergedInto.isBlank()) return ""
+        val target = itemDao.byMemoId(mergedInto) ?: return ""
+        return if (target.cloudEligible && target.policyLevel < 2) target.memoId else ""
+    }
 
     private companion object {
         const val CONSOLE_APP_ID = "osmemory_console"

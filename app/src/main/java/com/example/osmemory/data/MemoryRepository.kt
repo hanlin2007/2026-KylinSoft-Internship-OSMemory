@@ -3,6 +3,7 @@ package com.example.osmemory.data
 import android.content.Context
 import com.example.osmemory.core.dream.CloudTreeOps
 import com.example.osmemory.core.dream.DreamEngine
+import com.example.osmemory.core.dream.DreamPreferences
 import com.example.osmemory.core.dream.DreamReport
 import com.example.osmemory.core.dream.DreamScheduler
 import com.example.osmemory.core.dream.LocalTreeOps
@@ -32,7 +33,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * 数据门面（进程内"系统 API"形态，对应 PPT memo_collect / get_memo）
@@ -63,9 +67,13 @@ class MemoryRepository(context: Context) {
     private lateinit var localDreamEngine: DreamEngine
     private lateinit var cloudDreamEngine: DreamEngine
     private lateinit var dreamScheduler: DreamScheduler
+    private val dreamCycleMutex = Mutex()
+    private val localDreamMutex = Mutex()
+    private val cloudDreamMutex = Mutex()
 
     private val _lastProfile = MutableStateFlow<ProfileBuilder.ProfileResult?>(null)
     private val _lastDream = MutableStateFlow<DreamReport?>(null)
+    private val pendingDreamChange = AtomicReference<DreamReport?>(null)
 
     /** 端侧模型后台自动下载进度（首次启动触发；设置页实时展示） */
     private val _localModelDownload = MutableStateFlow<LocalModelStore.Progress?>(null)
@@ -108,6 +116,7 @@ class MemoryRepository(context: Context) {
 
     /** 模型/网络配置变更后重建通道依赖（provider 热插拔） */
     fun refreshChannels() {
+        if (::dreamScheduler.isInitialized) dreamScheduler.stop()
         provider = ModelManager.provider(context)
         pipeline = MemoryPipeline(itemDao, logDao, provider)
         val reranker = SemanticReranker(provider)
@@ -128,8 +137,9 @@ class MemoryRepository(context: Context) {
         )
         dreamScheduler = DreamScheduler(
             context = context,
-            dreamLocal = { dreamLocalNow() },
-            dreamCloud = { if (NetworkMonitor.isOnline(context)) dreamCloudNow() else null },
+            dreamCycle = { includeCloud, shouldRun ->
+                executeDreamCycle(includeCloud, shouldRun, publishScheduled = true)
+            },
             isOnline = { NetworkMonitor.isOnline(context) }
         )
         dreamScheduler.start()
@@ -169,39 +179,24 @@ class MemoryRepository(context: Context) {
     /**
      * 立即对本地树做一次 Dream（端侧算力；手动触发/离线周期用）。
      *
-     * 守卫：端侧模型未就绪（ABI 不支持 / GGUF 未下载校验）时**跳过**本轮，
-     * 不触发 llama.cpp 加载——469MB 模型加载需 1.5-2GB 内存，模拟器上
-     * 强行加载会 OOM 崩溃（OutOfMemoryError 抓不住 Exception，直接杀进程）。
-     * 跳过不等于失败：不参与调度器退避，模型就绪后下轮自然恢复。
+     * 守卫：端侧模型未就绪或可用内存不足时不触发 llama.cpp 加载——469MB 模型加载
+     * 需 1.5-2GB 内存；但仍执行确定性重复合并/常见冲突规则，并完整写入 DREAM 日志。
      */
-    suspend fun dreamLocalNow(): DreamReport {
+    suspend fun dreamLocalNow(publish: Boolean = true): DreamReport = localDreamMutex.withLock {
         val local = ModelManager.localProvider(context)
         val online = NetworkMonitor.isOnline(context)
         val skip = skipLocalDreamReason(local)
-        if (skip != null) {
-            val report = DreamReport(
-                tree = "LOCAL",
-                online = online,
-                conflictsResolved = 0,
-                splitCount = 0,
-                mergedCount = 0,
-                distilledCount = 0,
-                archivedCount = 0,
-                message = "本地树 Dream 跳过：$skip（就绪后自动恢复整合）",
-                degraded = false,
-                reason = skip,
-                at = System.currentTimeMillis()
-            )
-            _lastDream.value = report
-            return report
-        }
-        val report = localDreamEngine.dream(online = online)
-        _lastDream.value = report
-        return report
+        val report = localDreamEngine.dream(
+            online = online,
+            useModel = skip == null,
+            fallbackReason = skip.orEmpty()
+        )
+        if (publish) _lastDream.value = report
+        report
     }
 
     /**
-     * 本地 Dream 跳过的原因；null 表示可执行。
+     * 本地 Dream 不加载模型的原因；null 表示可安全执行端侧推理。
      * ① 端侧模型未就绪（ABI / GGUF 未下载校验）；
      * ② 可用内存不足 [MIN_FREE_MEMORY_FOR_LOCAL_DREAM]——469MB GGUF 加载需 ~1.5-2GB，
      *    低内存设备强行加载会 OOM 崩溃（Error 抓不住 Exception 直接杀进程）。
@@ -219,32 +214,100 @@ class MemoryRepository(context: Context) {
     }
 
     /** 立即对云端树做一次 Dream（云端算力；整合结果不脱离云端树）。离线时不可达，返回 null。 */
-    suspend fun dreamCloudNow(): DreamReport? {
-        if (!NetworkMonitor.isOnline(context)) return null
+    suspend fun dreamCloudNow(publish: Boolean = true): DreamReport? = cloudDreamMutex.withLock {
+        if (!NetworkMonitor.isOnline(context)) return@withLock null
         val report = cloudDreamEngine.dream(online = true)
-        _lastDream.value = report
-        return report
+        if (publish) _lastDream.value = report
+        report
     }
 
     /**
-     * 手动"立即 Dream"：按当前网络选择目标树——
-     * 在线：云端树 Dream（云端算力）；离线：本地树 Dream（端侧算力）。
-     * 返回 null 表示离线且云端不可达。
+     * 手动"立即 Dream"：始终先整合控制台写入的本地树；在线且云端 Dream 开启时，
+     * 再同步并整合云端树。最终返回组合报告，避免联网时误处理空的云端树而漏掉本地新增记忆。
      */
-    suspend fun dreamNow(): DreamReport? =
-        if (NetworkMonitor.isOnline(context)) dreamCloudNow() else dreamLocalNow()
+    suspend fun dreamNow(): DreamReport? {
+        dreamScheduler.cancelPendingNewMemory()
+        val reports = executeDreamCycle(
+            includeCloud = NetworkMonitor.isOnline(context) &&
+                DreamPreferences.isCloudDreamEnabled(context)
+        )
+        val current = reports.toCombinedDreamReport()
+        if (current.changed) pendingDreamChange.set(current)
+        val recentChange = if (current.changed) null else pendingDreamChange.getAndSet(null)?.takeIf {
+            System.currentTimeMillis() - it.at <= RECENT_DREAM_RESULT_MS
+        }
+        val displayed = if (!current.changed && recentChange?.changed == true) {
+            recentChange.copy(message = "最近一轮 Dream 已提前完成整合；${recentChange.message}")
+        } else {
+            current
+        }
+        _lastDream.value = displayed
+        return displayed
+    }
 
-    /** 新记忆入库后通知调度器（在线时后台异步快速触发一次云端树 Dream） */
+    /** 新记忆入库后通知调度器（去抖后先整合本地树，再按网络策略整合云端树）。 */
     fun notifyNewMemoryArrived() = dreamScheduler.notifyNewMemory()
+
+    /** 整个周期持有同一把锁，手动 Dream、AutoDream 与清空数据不会彼此穿插写入。 */
+    private suspend fun executeDreamCycle(
+        includeCloud: Boolean,
+        shouldRun: () -> Boolean = { true },
+        publishScheduled: Boolean = false
+    ): List<DreamReport> =
+        dreamCycleMutex.withLock {
+            if (!shouldRun()) return@withLock emptyList()
+            val reports = mutableListOf(dreamLocalNow(publish = false))
+            if (includeCloud && NetworkMonitor.isOnline(context)) {
+                // 先把本地 Dream 结果（含归档状态）推送到云端，再整合云端树。
+                ensureCloudIntegrated()
+                dreamCloudNow(publish = false)?.let(reports::add)
+            }
+            // 与整轮写入共用临界区，防止手动 waiter 抢在 AutoDream 发布前得到“稳定”报告。
+            if (publishScheduled) publishDreamReports(reports)
+            reports
+        }
+
+    /** AutoDream 在本地与云端都完成后只发布一次，避免云端“无变化”覆盖本地合并明细。 */
+    private fun publishDreamReports(reports: List<DreamReport>) {
+        if (reports.isEmpty()) return
+        val current = reports.toCombinedDreamReport()
+        if (current.changed) pendingDreamChange.set(current)
+        val recentChange = pendingDreamChange.get()?.takeIf {
+            System.currentTimeMillis() - it.at <= RECENT_DREAM_RESULT_MS
+        }
+        if (recentChange == null) pendingDreamChange.set(null)
+        // 稳定轮次不抹掉尚待控制台展示的最近变更；手动 Dream 会消费这份报告。
+        _lastDream.value = if (!current.changed && recentChange != null) recentChange else current
+    }
+
+    private fun List<DreamReport>.toCombinedDreamReport(): DreamReport =
+        if (size == 1) single() else combineDreamReports(this)
+
+    private fun combineDreamReports(reports: List<DreamReport>): DreamReport = DreamReport(
+        tree = reports.joinToString(" + ") { it.tree },
+        online = reports.any { it.online },
+        conflictsResolved = reports.sumOf { it.conflictsResolved },
+        splitCount = reports.sumOf { it.splitCount },
+        mergedCount = reports.sumOf { it.mergedCount },
+        distilledCount = reports.sumOf { it.distilledCount },
+        archivedCount = reports.sumOf { it.archivedCount },
+        message = reports.joinToString("；") { it.message },
+        degraded = reports.any { it.degraded },
+        reason = reports.map { it.reason }.filter { it.isNotBlank() }.distinct().joinToString("；"),
+        at = reports.maxOf { it.at },
+        details = reports.flatMap { report -> report.details.map { "${report.tree} · $it" } },
+        affectedMemoIds = reports.flatMap { it.affectedMemoIds }.distinct()
+    )
 
     // ---------- 记忆写入（memo_collect） ----------
 
     suspend fun collect(
         memoryText: String,
         source: String,
-        appId: String = MemoryPipeline.CONSOLE_APP_ID
+        appId: String = MemoryPipeline.CONSOLE_APP_ID,
+        allowDuplicateForDream: Boolean = false
     ): MemoryPipeline.CollectResult {
-        val result = pipeline.collect(memoryText, source, appId)
+        val result = pipeline.collect(memoryText, source, appId, allowDuplicateForDream)
         if (result is MemoryPipeline.CollectResult.Success) notifyNewMemoryArrived()
         return result
     }
@@ -294,7 +357,9 @@ class MemoryRepository(context: Context) {
     // ---------- 本地树 ↔ 云端树 单向同步（Network Gateway，阶段 2 修复：自动整合 + 云端 FAB） ----------
 
     /** 触发一次 本地→云端 单向同步（在线才真正推送，离线返回不可达报告） */
-    suspend fun syncNow(): TreeSyncManager.SyncReport = syncManager.sync()
+    suspend fun syncNow(): TreeSyncManager.SyncReport = cloudDreamMutex.withLock {
+        syncManager.sync()
+    }
 
     /**
      * 联网自动拉取：每次 离线→在线 网络切换时把本地待同步记忆拉取到云端树
@@ -302,7 +367,7 @@ class MemoryRepository(context: Context) {
      */
     suspend fun ensureCloudIntegrated(): TreeSyncManager.SyncReport? {
         if (!NetworkMonitor.isOnline(context)) return null
-        return syncManager.autoIntegrateIfNeeded()
+        return cloudDreamMutex.withLock { syncManager.autoIntegrateIfNeeded() }
     }
 
     /** 云端树 FAB 添加入口：云端创建记忆，敏感判断与本地一致（断网返回 Unreachable） */
@@ -310,7 +375,9 @@ class MemoryRepository(context: Context) {
         content: String,
         source: String,
         appId: String = MemoryPipeline.CONSOLE_APP_ID
-    ): TreeSyncManager.CloudAddResult = syncManager.addToCloud(content, source, appId)
+    ): TreeSyncManager.CloudAddResult = cloudDreamMutex.withLock {
+        syncManager.addToCloud(content, source, appId)
+    }
 
     // ---------- 记忆画像（阶段 2） ----------
 
@@ -411,14 +478,27 @@ class MemoryRepository(context: Context) {
 
     /** 清空本地树 + 云端树 + 全部日志 */
     suspend fun clearAll() {
-        itemDao.deleteAll()
-        cloudDao.deleteAll()
-        logDao.deleteAll()
+        dreamScheduler.cancelPendingNewMemory()
+        dreamCycleMutex.withLock {
+            localDreamMutex.withLock {
+                cloudDreamMutex.withLock {
+                    itemDao.deleteAll()
+                    cloudDao.deleteAll()
+                    logDao.deleteAll()
+                }
+            }
+            _lastDream.value = null
+            _lastProfile.value = null
+            pendingDreamChange.set(null)
+            syncManager.resetLastSync()
+        }
     }
 
     private companion object {
         /** 本地 Dream 最低可用内存：469MB GGUF 加载峰值约需 1.5-2GB，低内存跳过防 OOM */
         const val MIN_FREE_MEMORY_FOR_LOCAL_DREAM = 1_200L * 1024 * 1024
+        /** 手动按钮可回显最近一次由 AutoDream 抢先完成的真实变更。 */
+        const val RECENT_DREAM_RESULT_MS = 15L * 60_000L
     }
 }
 

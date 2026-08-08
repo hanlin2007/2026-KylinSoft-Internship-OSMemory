@@ -7,6 +7,7 @@ import com.example.osmemory.data.db.dao.MemoryLogDao
 import com.example.osmemory.data.db.entity.MemoryItemEntity
 import com.example.osmemory.data.db.entity.MemoryLogEntity
 import com.example.osmemory.core.pipeline.MemoryPipeline.Companion.LOG_SECURITY
+import com.example.osmemory.core.pipeline.MemoryPipeline.Companion.SYNC_PENDING
 import com.example.osmemory.core.model.JsonTools
 
 /**
@@ -33,7 +34,14 @@ class LocalTreeOps(
 
     override suspend fun update(item: DreamItem) {
         val entity = itemDao.byMemoId(item.memoId) ?: return
-        itemDao.update(entity.copy(confidence = item.confidence, evidenceRaw = item.evidenceRaw, updatedAt = item.updatedAt))
+        itemDao.update(
+            entity.copy(
+                confidence = item.confidence,
+                evidenceRaw = item.evidenceRaw,
+                updatedAt = item.updatedAt,
+                syncState = if (entity.cloudEligible && entity.policyLevel < 2) SYNC_PENDING else entity.syncState
+            )
+        )
     }
 
     override suspend fun insert(item: DreamItem): String {
@@ -58,14 +66,15 @@ class LocalTreeOps(
         return item.memoId
     }
 
-    override suspend fun archive(itemId: Long, mergedInto: String) {
-        val entity = itemDao.byId(itemId) ?: return
+    override suspend fun archive(item: DreamItem, mergedInto: String) {
+        val entity = itemDao.byMemoId(item.memoId) ?: return
         val wasSensitive = entity.policyLevel >= 2
         itemDao.update(
             entity.copy(
                 dreamState = DreamItem.STATE_ARCHIVED,
                 mergedInto = mergedInto,
-                updatedAt = System.currentTimeMillis()
+                updatedAt = System.currentTimeMillis(),
+                syncState = if (entity.cloudEligible && entity.policyLevel < 2) SYNC_PENDING else entity.syncState
             )
         )
         // 安全基线留痕：敏感记忆被整合吞并（含被普通记忆覆盖的冲突场景）
@@ -139,8 +148,8 @@ class CloudTreeOps(
         return item.memoId
     }
 
-    override suspend fun archive(itemId: Long, mergedInto: String) {
-        val entity = cloudDao.byId(itemId) ?: return
+    override suspend fun archive(item: DreamItem, mergedInto: String) {
+        val entity = cloudDao.byMemoId(item.memoId) ?: return
         val wasSensitive = entity.policyLevel >= 2
         cloudDao.update(
             entity.copy(

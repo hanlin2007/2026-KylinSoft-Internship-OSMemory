@@ -69,7 +69,7 @@ class ProfileFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             repo.observeLastDream().collect { report ->
                 if (report == null) return@collect
-                if (report.tree != "LOCAL") return@collect
+                if (!report.tree.split(" + ").contains("LOCAL")) return@collect
                 if (!report.changed) return@collect
                 if (report.at <= lastConsumedDreamAt) return@collect
                 lastConsumedDreamAt = report.at

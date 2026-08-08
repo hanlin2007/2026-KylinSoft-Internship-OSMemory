@@ -42,10 +42,12 @@ interface MemoryItemDao {
     @Query(
         """
         SELECT * FROM memory_items
-        WHERE content LIKE '%' || :keyword || '%'
-           OR tags LIKE '%' || :keyword || '%'
-           OR category LIKE '%' || :keyword || '%'
-           OR title LIKE '%' || :keyword || '%'
+        WHERE dreamState = 0 AND (
+               content LIKE '%' || :keyword || '%'
+            OR tags LIKE '%' || :keyword || '%'
+            OR category LIKE '%' || :keyword || '%'
+            OR title LIKE '%' || :keyword || '%'
+        )
         ORDER BY createdAt DESC
         LIMIT :limit
         """
@@ -60,7 +62,7 @@ interface MemoryItemDao {
     @Query(
         """
         SELECT * FROM memory_items
-        WHERE contentHash = :hash AND source = :source AND createdAt >= :since
+        WHERE dreamState = 0 AND contentHash = :hash AND source = :source AND createdAt >= :since
         ORDER BY createdAt DESC LIMIT 1
         """
     )
@@ -96,6 +98,9 @@ interface MemoryItemDao {
     // ---------- 画像 / 审计 ----------
 
     /** 按分类取记忆（画像聚合用） */
-    @Query("SELECT * FROM memory_items WHERE category = :category ORDER BY createdAt DESC LIMIT :limit")
+    @Query(
+        "SELECT * FROM memory_items WHERE dreamState = 0 AND category = :category " +
+            "ORDER BY createdAt DESC LIMIT :limit"
+    )
     suspend fun byCategory(category: String, limit: Int = 50): List<MemoryItemEntity>
 }

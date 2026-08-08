@@ -56,7 +56,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:lineSpacingExtra="3dp"
-                    android:text="在线（内网）：每周期先做云端树 Dream（云端算力，结果不脱离云端树），再以端侧算力整合本地树；新增记忆入库时自动快速触发一次云端 Dream。\n\n离线：仅每周期以端侧算力整合本地树（算力有限，不触发云端）。"
+                    android:text="在线（内网）：每周期先整合本地树，再同步整合结果并执行云端树 Dream；新增记忆入库后会去抖触发同一流程。\n\n离线：仅整合本地树；端侧模型未就绪或内存不足时，重复合并与常见冲突仍由确定性规则完成。"
                     android:textColor="?android:attr/textColorSecondary"
                     android:textSize="13sp" />
 

@@ -16,6 +16,7 @@ import com.example.osmemory.R
 import com.example.osmemory.core.dream.DreamPreferences
 import com.example.osmemory.core.dream.DreamReport
 import com.example.osmemory.data.MemoryService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -81,12 +82,26 @@ class DreamSettingsFragment : Fragment() {
         val online = MemoryService.repo(ctx).observeNetwork().value
         val tv = root.findViewById<TextView>(R.id.tvDreamResult)
         tv.isVisible = true
-        tv.text = if (online) "正在执行云端树 Dream（云端算力）…" else "正在执行本地树 Dream（端侧算力）…"
+        tv.text = if (online) {
+            "正在整合本地树，并同步检查云端树…"
+        } else {
+            "正在执行本地树 Dream（端侧算力/规则兜底）…"
+        }
         tv.setTextColor(ContextCompat.getColor(ctx, R.color.semantic_public))
 
         viewLifecycleOwner.lifecycleScope.launch {
-            val report = withContext(Dispatchers.IO) {
-                MemoryService.repo(requireContext()).dreamNow()
+            val report = try {
+                withContext(Dispatchers.IO) {
+                    MemoryService.repo(requireContext()).dreamNow()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (!isAdded || view !== root) return@launch
+                tv.text = "Dream 执行失败：${e.message ?: "未知错误"}"
+                tv.setTextColor(ContextCompat.getColor(requireContext(), R.color.semantic_sensitive))
+                Toast.makeText(requireContext(), "Dream 执行失败", Toast.LENGTH_SHORT).show()
+                return@launch
             }
             if (!isAdded || view !== root) return@launch
             if (report == null) {
@@ -109,6 +124,12 @@ class DreamSettingsFragment : Fragment() {
         val summary = buildString {
             append("${report.tree} 树 · ${TIME_FORMAT.format(Date(report.at))}\n")
             append("冲突消解 ${report.conflictsResolved} · 拆分 ${report.splitCount} · 合并 ${report.mergedCount} · 高维提炼 ${report.distilledCount} · 归档 ${report.archivedCount}\n")
+            if (report.details.isNotEmpty()) {
+                append(report.details.take(8).joinToString("\n") { "• $it" })
+                append('\n')
+            } else {
+                append("• 本轮没有需要修改的记忆\n")
+            }
             if (report.degraded) append("（部分步骤降级：${report.reason.take(80)}）")
         }
         tv.text = summary

@@ -5,6 +5,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -16,9 +17,8 @@ import java.util.concurrent.atomic.AtomicLong
  *
  * 双策略（对齐需求）：
  *  - 在线（内网/联网）：每 [DreamPreferences.intervalMinutes] 分钟触发一次
- *    ① 云端树 Dream（云端算力，整合结果不脱离云端树）；
- *    ② 同步用端侧算力整合本地树。
- *    且当记忆库存在新记忆时（collect 成功），后台异步快速触发一次云端树 Dream（去抖）。
+ *    ① 端侧算力整合本地树；② 同步整合结果；③ 云端树 Dream（结果不脱离云端树）。
+ *    且当记忆库存在新记忆时（collect 成功），后台去抖后执行同一顺序。
  *  - 离线：每 [DreamPreferences.intervalMinutes] 分钟，用端侧算力整合本地树（算力有限，不触发云端）。
  *
  * 工程机制（提炼自 Claude Code autoDream 与 Hermes curator）：
@@ -28,8 +28,10 @@ import java.util.concurrent.atomic.AtomicLong
  */
 class DreamScheduler(
     private val context: Context,
-    private val dreamLocal: suspend () -> DreamReport,
-    private val dreamCloud: suspend () -> DreamReport?,
+    private val dreamCycle: suspend (
+        includeCloud: Boolean,
+        shouldRun: () -> Boolean
+    ) -> List<DreamReport>,
     private val isOnline: () -> Boolean
 ) {
     /**
@@ -40,45 +42,62 @@ class DreamScheduler(
         SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, _ -> }
     )
     private val lock = AtomicBoolean(false)
-    private val lastCloudDreamAt = AtomicLong(0)
+    private val newMemoryGeneration = AtomicLong(0)
 
     /** 连续失败次数（退避用）；成功后清零 */
     private var failStreak = 0
-
-    /** 新记忆触发云端 Dream 的去抖窗口（合并短时间内的多次触发） */
-    private val newMemoryDedupMs = 20_000L
 
     /** 退避上限：30 分钟（不把演示周期拖太长） */
     private val maxBackoffMinutes = 30L
 
     fun start() {
         scope.launch {
+            // 启动后先等待一个配置周期；新记忆由 notifyNewMemory 单独去抖触发。
+            // 避免应用刚打开就抢先整合演示数据，导致随后手动 Dream 只能显示“保持稳定”。
+            var nextDelay = DreamPreferences.intervalMinutes(context) * 60_000L
             while (isActive) {
-                val interval = runDreamCycle()
-                delay(interval)
+                if (!DreamPreferences.isEnabled(context)) {
+                    delay(DISABLED_POLL_MS)
+                    nextDelay = DreamPreferences.intervalMinutes(context) * 60_000L
+                    continue
+                }
+                delay(nextDelay)
+                if (!DreamPreferences.isEnabled(context)) continue
+                nextDelay = runDreamCycle()
             }
         }
     }
 
-    /** 新记忆到达：在线时异步快速触发一次云端树 Dream（离线不触发——算力有限，等周期） */
+    /** 停止旧调度器；模型配置刷新时防止多个周期任务并存。 */
+    fun stop() = scope.cancel()
+
+    /**
+     * 新记忆到达：等待短暂静默窗口后先 Dream 本地树；在线且云端开关开启时再 Dream 云端树。
+     * generation 去抖保证连续添加多条记忆时只在最后一条之后执行一次，恰好能看到完整冲突/重复集合。
+     */
     fun notifyNewMemory() {
+        val generation = newMemoryGeneration.incrementAndGet()
         scope.launch {
-            if (!isOnline()) return@launch
-            val now = System.currentTimeMillis()
-            if (now - lastCloudDreamAt.get() < newMemoryDedupMs) return@launch
-            dreamCloudSafe()
+            delay(NEW_MEMORY_DEBOUNCE_MS)
+            if (generation != newMemoryGeneration.get()) return@launch
+            if (!DreamPreferences.isEnabled(context)) return@launch
+            executeCycleSafe(
+                includeCloud = isOnline() && DreamPreferences.isCloudDreamEnabled(context),
+                shouldRun = { generation == newMemoryGeneration.get() }
+            )
         }
+    }
+
+    /** 手动 Dream 开始前取消尚未执行的新记忆任务，避免后台任务抢先消费演示数据。 */
+    fun cancelPendingNewMemory() {
+        newMemoryGeneration.incrementAndGet()
     }
 
     /** 执行一次完整 Dream 周期；返回下一次等待间隔（毫秒，含失败退避） */
     private suspend fun runDreamCycle(): Long {
         val online = isOnline()
         val cloudEnabled = DreamPreferences.isCloudDreamEnabled(context)
-        val success = if (online && cloudEnabled) {
-            dreamCloudSafe() && dreamLocalSafe()
-        } else {
-            dreamLocalSafe()
-        }
+        val success = executeCycleSafe(includeCloud = online && cloudEnabled)
         if (!success) {
             failStreak++
             return minOf(maxBackoffMinutes, DREAM_MINUTES_BASE * (1L shl minOf(failStreak, 6))) * 60_000L
@@ -87,12 +106,15 @@ class DreamScheduler(
         return DreamPreferences.intervalMinutes(context) * 60_000L
     }
 
-    private suspend fun dreamCloudSafe(): Boolean {
+    /** 一次本地→同步→云端周期作为整体互斥，最终只发布一份组合报告。 */
+    private suspend fun executeCycleSafe(
+        includeCloud: Boolean,
+        shouldRun: () -> Boolean = { true }
+    ): Boolean {
         return try {
-            if (!lock.compareAndSet(false, true)) return true // 并发整合：跳过本轮
+            if (!lock.compareAndSet(false, true)) return true
             try {
-                val report = dreamCloud()
-                if (report != null) lastCloudDreamAt.set(System.currentTimeMillis())
+                dreamCycle(includeCloud, shouldRun)
                 true
             } finally {
                 lock.set(false)
@@ -102,22 +124,10 @@ class DreamScheduler(
         }
     }
 
-    private suspend fun dreamLocalSafe(): Boolean {
-        return try {
-            if (!lock.compareAndSet(false, true)) return true
-            try {
-                dreamLocal()
-                true
-            } finally {
-                lock.set(false)
-            }
-        } catch (e: Throwable) {
-            false
-        }
-    }
-
     private companion object {
         /** 基础间隔（分钟）：用于退避计算与默认周期 */
         const val DREAM_MINUTES_BASE = 5L
+        const val NEW_MEMORY_DEBOUNCE_MS = 60_000L
+        const val DISABLED_POLL_MS = 30_000L
     }
 }

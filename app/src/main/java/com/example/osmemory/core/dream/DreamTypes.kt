@@ -74,11 +74,11 @@ data class DreamReport(
     /** 目标树：LOCAL（本地树·端侧算力） / CLOUD（云端树·云端算力） */
     val tree: String,
     val online: Boolean,
-    /** 冲突消解条数（后写入优先覆盖，旧记忆归档） */
+    /** 冲突消解条数（安全等级优先；同级后写入优先，输家归档） */
     val conflictsResolved: Int,
     /** 原子拆分条数（复合记忆拆成多条原子记忆） */
     val splitCount: Int,
-    /** 去重合并条数（近似重复合并，被并者归档） */
+    /** 去重合并条数（等价或经模型复核的语义重复合并，被并者归档） */
     val mergedCount: Int,
     /** 高维提炼条数（包含/推理整合后提炼的高维记忆） */
     val distilledCount: Int,
@@ -87,12 +87,17 @@ data class DreamReport(
     val message: String,
     val degraded: Boolean,
     val reason: String,
-    val at: Long
+    val at: Long,
+    /** 控制台直接展示的整合明细（如“旧记忆 → 保留记忆”）。 */
+    val details: List<String> = emptyList(),
+    /** 本轮实际涉及的 memoId，供 DREAM 审计日志追溯。 */
+    val affectedMemoIds: List<String> = emptyList()
 ) {
     val succeeded: Boolean get() = !degraded || conflictsResolved > 0 || mergedCount > 0 || splitCount > 0
 
     val changed: Boolean
-        get() = conflictsResolved > 0 || mergedCount > 0 || distilledCount > 0 || archivedCount > 0
+        get() = conflictsResolved > 0 || splitCount > 0 || mergedCount > 0 ||
+            distilledCount > 0 || archivedCount > 0
 }
 
 /** 树写入抽象：Dream 引擎通过它读写任一树（云端 Dream 结果不脱离云端树） */
@@ -102,7 +107,7 @@ interface TreeOps {
     suspend fun allArchived(): List<DreamItem>
     suspend fun update(item: DreamItem)
     suspend fun insert(item: DreamItem): String
-    suspend fun archive(itemId: Long, mergedInto: String)
+    suspend fun archive(item: DreamItem, mergedInto: String)
 }
 
 /**

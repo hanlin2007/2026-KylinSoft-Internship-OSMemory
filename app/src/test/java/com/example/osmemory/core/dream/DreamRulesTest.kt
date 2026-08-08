@@ -1,6 +1,7 @@
 package com.example.osmemory.core.dream
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -51,6 +52,8 @@ class DreamRulesTest {
     fun `负面词命中返回负极性`() {
         assertEquals(-1, DreamRules.positivePolarity("我讨厌雨天出门"))
         assertEquals(-1, DreamRules.positivePolarity("我不愿意加班，决定取消今晚的安排"))
+        assertEquals(-1, DreamRules.positivePolarity("我不喜欢喝咖啡"))
+        assertEquals(-1, DreamRules.positivePolarity("我不再支持晚上跑步"))
     }
 
     @Test
@@ -61,6 +64,32 @@ class DreamRulesTest {
     @Test
     fun `无词命中返回中性`() {
         assertEquals(0, DreamRules.positivePolarity("今天天气不错，出门走了走"))
+    }
+
+    @Test
+    fun `立场相反但主题相同的文本主题相似度为一`() {
+        assertEquals(1f, DreamRules.topicSimilarity("我喜欢喝咖啡", "我不喜欢喝咖啡"), 0f)
+        assertTrue(DreamRules.isNegated("我不喜欢喝咖啡"))
+        assertTrue(DreamRules.isNegated("我每天不跑步"))
+    }
+
+    @Test
+    fun `否定或数值不同的近似文本禁止当作重复合并`() {
+        assertFalse(DreamRules.mergeCompatible("我喜欢跑步", "我不喜欢跑步"))
+        assertFalse(DreamRules.mergeCompatible("手机运行内存是4GB", "手机运行内存是8GB"))
+        assertFalse(DreamRules.mergeCompatible("运行内存4GB，存储128GB", "运行内存128GB，存储4GB"))
+        assertFalse(DreamRules.mergeCompatible("运行内存是1.5GB", "运行内存是15GB"))
+        assertFalse(DreamRules.mergeCompatible("地址是建国路88号", "地址是建国路89号"))
+        assertTrue(DreamRules.mergeCompatible("我每天跑步。", "我每天跑步"))
+        assertTrue(DreamRules.mergeCompatible("我喜欢喝咖啡", "我很喜欢喝咖啡"))
+        assertTrue(DreamRules.exactEquivalent("Hello World!", "hello world"))
+        assertFalse(
+            DreamRules.exactEquivalent(
+                "运行内存4GB，存储128GB",
+                "运行内存128GB，存储4GB"
+            )
+        )
+        assertFalse(DreamRules.exactEquivalent("运行内存是1.5GB", "运行内存是15GB"))
     }
 
     // ---------- ruleSplit（句读拆分） ----------

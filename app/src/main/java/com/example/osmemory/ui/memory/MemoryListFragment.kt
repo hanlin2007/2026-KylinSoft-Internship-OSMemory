@@ -284,7 +284,7 @@ class MemoryListFragment : Fragment() {
         showLocalAddDialog()
     }
 
-    /** 本地树添加：走标准流水线（净化→门控→LLM 抽取→去重→入库→双日志） */
+    /** 本地树添加：走标准流水线；控制台重复项标记后保留，交给 Dream 演示实际合并。 */
     private fun showLocalAddDialog() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_add_memory, null)
         val etContent = dialogView.findViewById<EditText>(R.id.etContent)
@@ -337,12 +337,19 @@ class MemoryListFragment : Fragment() {
         val pb = view?.findViewById<ProgressBar>(R.id.pbLoading)
         pb?.isVisible = true
         viewLifecycleOwner.lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) { repo.collect(text, source) }
+            val result = withContext(Dispatchers.IO) {
+                // 控制台需要保留重复候选，便于演示 Dream 的实际合并；系统 API 仍保持默认入库去重。
+                repo.collect(text, source, allowDuplicateForDream = true)
+            }
             pb?.isVisible = false
             val ctx = requireContext()
             when (result) {
                 is MemoryPipeline.CollectResult.Success -> {
-                    val suffix = if (result.degraded) "（模型通道不可用，已降级原文入库）" else ""
+                    val suffix = when {
+                        result.duplicateOf != null -> "（已作为 Dream 待合并项入库）"
+                        result.degraded -> "（模型通道不可用，已降级原文入库）"
+                        else -> ""
+                    }
                     Toast.makeText(ctx, "已入库${suffix}：${result.item.title}", Toast.LENGTH_LONG).show()
                 }
                 is MemoryPipeline.CollectResult.Duplicate ->

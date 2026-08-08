@@ -48,7 +48,12 @@ class MemoryPipeline(
 
     /** 收集结果 */
     sealed interface CollectResult {
-        data class Success(val item: MemoryItemEntity, val degraded: Boolean) : CollectResult
+        data class Success(
+            val item: MemoryItemEntity,
+            val degraded: Boolean,
+            /** 控制台演示模式下，该项会保留到 Dream 阶段再合并。 */
+            val duplicateOf: String? = null
+        ) : CollectResult
         data class Duplicate(val existing: MemoryItemEntity) : CollectResult
         data class Rejected(val reason: String) : CollectResult
     }
@@ -60,7 +65,12 @@ class MemoryPipeline(
         data class Rejected(val reason: String) : UpdateResult
     }
 
-    suspend fun collect(memoryText: String, source: String, appId: String = CONSOLE_APP_ID): CollectResult {
+    suspend fun collect(
+        memoryText: String,
+        source: String,
+        appId: String = CONSOLE_APP_ID,
+        allowDuplicateForDream: Boolean = false
+    ): CollectResult {
         // ① 净化（sanitize）
         val text = memoryText.trim()
         if (text.isEmpty()) return CollectResult.Rejected("内容为空")
@@ -83,7 +93,7 @@ class MemoryPipeline(
         // ④ 去重：24h 内同源同归一化内容 → 拒绝
         val hash = TextTools.normalizeHash(text)
         val existing = itemDao.findByHash(hash, source, now - DEDUP_WINDOW_MS)
-        if (existing != null) {
+        if (existing != null && !allowDuplicateForDream) {
             logDao.insert(
                 MemoryLogEntity(
                     logType = LOG_COLLECT, action = "reject_duplicate",
@@ -122,10 +132,12 @@ class MemoryPipeline(
         // ⑥ 双日志：传入 + 推理（降级原因必可见）
         logDao.insert(
             MemoryLogEntity(
-                logType = LOG_COLLECT, action = "add",
+                logType = LOG_COLLECT,
+                action = if (existing == null) "add" else "add_duplicate_candidate",
                 appId = appId, memoIds = memoId, timestamp = now,
                 source = source,
-                contentSummary = TextTools.truncate(text, 80),
+                contentSummary = if (existing == null) TextTools.truncate(text, 80)
+                else "待 Dream 合并：${TextTools.truncate(text, 60)}（重复于 ${existing.memoId}）",
                 tags = extracted.tags.joinToString(","),
                 extra = JsonTools.buildJson(
                     "policyLevel" to item.policyLevel,
@@ -133,7 +145,8 @@ class MemoryPipeline(
                     "degraded" to degraded,
                     "degradeReason" to degradeReason,
                     "cloudEligible" to item.cloudEligible,
-                    "syncState" to item.syncState
+                    "syncState" to item.syncState,
+                    "duplicateOf" to existing?.memoId
                 )
             )
         )
@@ -175,7 +188,7 @@ class MemoryPipeline(
             )
         }
 
-        return CollectResult.Success(item, degraded)
+        return CollectResult.Success(item, degraded, duplicateOf = existing?.memoId)
     }
 
     /**
