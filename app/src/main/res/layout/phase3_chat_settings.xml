@@ -53,4 +53,42 @@
         android:textColor="#FF616161"
         android:textSize="14sp" />
 
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="20dp"
+        android:background="#FFE0E0E0" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="20dp"
+        android:layout_marginEnd="20dp"
+        android:text="项目 / 会话记忆"
+        android:textColor="#FF303030"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="32dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginEnd="32dp"
+        android:text="清空聊天中模型提炼并保留在对话应用里的旧记忆，便于重新演示。"
+        android:textColor="#FF616161"
+        android:textSize="14sp" />
+
+    <Button
+        android:id="@+id/p3_chat_settings_clear_memories"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="20dp"
+        android:backgroundTint="#FFE53935"
+        android:text="清空对话记忆"
+        android:textColor="#FFFFFFFF" />
+
 </LinearLayout>

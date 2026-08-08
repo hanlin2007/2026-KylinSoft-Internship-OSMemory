@@ -38,6 +38,14 @@ class ChatMemoryStore(context: Context) {
         return record
     }
 
+    /** 清空全部项目/会话记忆（演示前重置用）；返回被清除的条数。 */
+    @Synchronized
+    fun clear(): Int {
+        val count = readRecords().size
+        preferences.edit().remove(KEY_RECORDS).apply()
+        return count
+    }
+
     @Synchronized
     fun markSynced(localId: String, memoId: String) {
         update(localId) {

@@ -205,6 +205,15 @@
                             app:trackThickness="3dp" />
                     </LinearLayout>
 
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/p3_classifier_clear_button"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="清空生成类别"
+                        app:icon="@android:drawable/ic_menu_delete" />
+
                     <TextView
                         android:id="@+id/p3_classifier_scan_status"
                         android:layout_width="match_parent"

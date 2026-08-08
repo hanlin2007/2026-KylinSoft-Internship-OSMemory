@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.view.View
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -70,6 +71,29 @@ class ClassifierActivity : AppCompatActivity() {
         findViewById<MaterialButton>(R.id.p3_classifier_fake_upload_button)
             .setOnClickListener { demonstrateUpload() }
         scanButton.setOnClickListener { scanMemoriesForCategories() }
+        findViewById<MaterialButton>(R.id.p3_classifier_clear_button)
+            .setOnClickListener { clearGeneratedCategories() }
+    }
+
+    /** 演示前重置：清空模型生成的全部类别（默认类别不可删除）。 */
+    private fun clearGeneratedCategories() {
+        if (generatedCategories.isEmpty()) {
+            Toast.makeText(this, "没有可清空的生成类别", Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("清空生成类别")
+            .setMessage("将删除 ${generatedCategories.size} 个由记忆生成的开放类别，默认类别保留。")
+            .setPositiveButton("清空") { _, _ ->
+                generatedCategories = emptyList()
+                categoryStore.save(emptyList())
+                renderCategories()
+                scanStatus.text = "已清空全部生成类别，默认类别保持可用。"
+                scanStatus.setTextColor(color(R.color.semantic_normal))
+                Toast.makeText(this, "已清空生成类别", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     /** No picker, permission or stream is opened here: this is deliberately a visual stub. */
