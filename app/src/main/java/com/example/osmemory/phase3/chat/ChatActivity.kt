@@ -373,8 +373,6 @@ class ChatActivity : AppCompatActivity() {
                 }
             })
         }
-        // 同步成功后刷新面板，让"正在同步"立刻变为"已同步"
-        renderProjectMemories()
         projectMemoryScroll.post { projectMemoryScroll.fullScroll(View.FOCUS_DOWN) }
     }
 
