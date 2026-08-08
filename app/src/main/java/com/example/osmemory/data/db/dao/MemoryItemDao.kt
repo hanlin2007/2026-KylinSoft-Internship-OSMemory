@@ -26,6 +26,9 @@ interface MemoryItemDao {
     @Query("SELECT * FROM memory_items WHERE memoId = :memoId LIMIT 1")
     suspend fun byMemoId(memoId: String): MemoryItemEntity?
 
+    @Query("SELECT * FROM memory_items WHERE id = :id LIMIT 1")
+    suspend fun byId(id: Long): MemoryItemEntity?
+
     @Query("SELECT COUNT(*) FROM memory_items")
     suspend fun count(): Int
 

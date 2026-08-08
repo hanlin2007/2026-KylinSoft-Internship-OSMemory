@@ -64,6 +64,20 @@
                 android:paddingBottom="3dp"
                 android:textSize="11sp"
                 tools:text="待同步" />
+
+            <TextView
+                android:id="@+id/tvDreamBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_badge"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:paddingTop="3dp"
+                android:paddingBottom="3dp"
+                android:textSize="11sp"
+                android:visibility="gone"
+                tools:text="已归档" />
         </LinearLayout>
 
         <TextView

@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/brand_background"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="AutoDream · 记忆自进化"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:lineSpacingExtra="3dp"
+            android:text="模拟睡眠式记忆巩固：冲突消解（后写入优先）、原子拆分、去重合并、包含/推理整合与高维提炼。被吞并的记忆归档保留（可编辑恢复），全部过程写入 DREAM 日志。"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="13sp" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="14dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="调度策略"
+                    android:textColor="?attr/colorPrimary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:lineSpacingExtra="3dp"
+                    android:text="在线（内网）：每周期先做云端树 Dream（云端算力，结果不脱离云端树），再以端侧算力整合本地树；新增记忆入库时自动快速触发一次云端 Dream。\n\n离线：仅每周期以端侧算力整合本地树（算力有限，不触发云端）。"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:textSize="13sp" />
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/swDreamEnabled"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="启用 AutoDream" />
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/swCloudDream"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="启用云端树 Dream（在线时）" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Dream 间隔（分钟）"
+                        android:textColor="?android:attr/textColorPrimary"
+                        android:textSize="14sp" />
+
+                    <EditText
+                        android:id="@+id/etDreamInterval"
+                        android:layout_width="72dp"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:inputType="number"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="范围 1~60 分钟；演示建议 1~2 分钟（在线时新增记忆也会立即触发）。"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:textSize="12sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSaveDream"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="保存设置" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnDreamNow"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:text="立即 Dream" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="14dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="最近 Dream 结果"
+                    android:textColor="?attr/colorPrimary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvDreamResult"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:lineSpacingExtra="3dp"
+                    android:text="尚未执行 Dream。点击「立即 Dream」或等待调度周期自动触发。"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </LinearLayout>
+</ScrollView>

@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
  * 云端树数据库（Cloud Tree）——独立 .db 文件模拟"云端"隔离存储。
@@ -16,7 +18,7 @@ import androidx.room.RoomDatabase
  */
 @Database(
     entities = [CloudMemoryItemEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class CloudTreeDatabase : RoomDatabase() {
@@ -27,13 +29,23 @@ abstract class CloudTreeDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: CloudTreeDatabase? = null
 
+        /** v1 → v2：云端树 AutoDream 归档式遗忘两字段 */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE cloud_memory_items ADD COLUMN dreamState INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE cloud_memory_items ADD COLUMN mergedInto TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun get(context: Context): CloudTreeDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     CloudTreeDatabase::class.java,
                     "osmemory_cloud.db"
-                ).build().also { INSTANCE = it }
+                )
+                    .addMigrations(MIGRATION_1_2)
+                    .build().also { INSTANCE = it }
             }
     }
 }

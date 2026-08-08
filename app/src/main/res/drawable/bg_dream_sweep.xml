@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 刷过亮条：白色高光渐变（模拟旧画像被"刷"成新画像） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="0"
+        android:startColor="#00FFFFFF"
+        android:centerColor="#B3FFFFFF"
+        android:endColor="#00FFFFFF"
+        android:type="linear" />
+</shape>

@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -48,6 +49,7 @@ class MemoryAdapter(
         private val tvContent = itemView.findViewById<TextView>(R.id.tvContent)
         private val tvPolicy = itemView.findViewById<TextView>(R.id.tvPolicy)
         private val tvSync = itemView.findViewById<TextView>(R.id.tvSyncBadge)
+        private val tvDream = itemView.findViewById<TextView>(R.id.tvDreamBadge)
         private val tvCategory = itemView.findViewById<TextView>(R.id.tvCategory)
         private val tvMeta = itemView.findViewById<TextView>(R.id.tvMeta)
         private val tvTags = itemView.findViewById<TextView>(R.id.tvTags)
@@ -73,6 +75,23 @@ class MemoryAdapter(
             tvSync.setTextColor(ContextCompat.getColor(context, row.syncColorRes))
             tvSync.backgroundTintList =
                 ColorStateList.valueOf(ContextCompat.getColor(context, row.syncBgRes))
+
+            // AutoDream 归档徽标（被冲突覆盖/被合并/被拆分吞并的记忆，可编辑恢复）
+            if (row.dreamState == 2) {
+                tvDream.isVisible = true
+                tvDream.text = if (row.mergedInto.isNotBlank()) "已并入 ${row.mergedInto.takeLast(6)}" else "已归档"
+                tvDream.setTextColor(ContextCompat.getColor(context, R.color.semantic_public))
+                tvDream.backgroundTintList =
+                    ColorStateList.valueOf(ContextCompat.getColor(context, R.color.semantic_public_bg))
+            } else if (row.dreamState == 1) {
+                tvDream.isVisible = true
+                tvDream.text = "陈旧"
+                tvDream.setTextColor(ContextCompat.getColor(context, R.color.semantic_degraded))
+                tvDream.backgroundTintList =
+                    ColorStateList.valueOf(ContextCompat.getColor(context, R.color.log_infer_bg))
+            } else {
+                tvDream.isVisible = false
+            }
 
             // 分类徽标
             tvCategory.text = row.category
@@ -131,7 +150,9 @@ data class MemoryRow(
     val syncLabel: String,
     val syncColorRes: Int,
     val syncBgRes: Int,
-    val tree: String
+    val tree: String,
+    val dreamState: Int = 0,
+    val mergedInto: String = ""
 ) {
     val isCloud: Boolean get() = tree == "CLOUD"
 
@@ -168,7 +189,9 @@ data class MemoryRow(
                 syncLabel = label,
                 syncColorRes = color,
                 syncBgRes = bg,
-                tree = "LOCAL"
+                tree = "LOCAL",
+                dreamState = item.dreamState,
+                mergedInto = item.mergedInto
             )
         }
 
@@ -189,7 +212,9 @@ data class MemoryRow(
                 syncLabel = if (fromLocalSync) "来自本地同步" else "云端创建",
                 syncColorRes = R.color.log_collect,
                 syncBgRes = R.color.log_collect_bg,
-                tree = "CLOUD"
+                tree = "CLOUD",
+                dreamState = item.dreamState,
+                mergedInto = item.mergedInto
             )
         }
     }

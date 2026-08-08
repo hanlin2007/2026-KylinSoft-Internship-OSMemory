@@ -65,6 +65,15 @@ data class MemoryItemEntity(
     /** 质量 Quality：冲突状态 0=无冲突 1=疑似冲突 2=已整合（AutoDream 使用） */
     val conflictState: Int = 0,
 
+    /**
+     * 质量 Quality：Dream 状态（阶段 4 AutoDream，归档式遗忘）：
+     * 0=活跃 1=陈旧 2=已归档（被冲突覆盖/被合并/被拆分吞并，不物理删除，可恢复）
+     */
+    val dreamState: Int = 0,
+
+    /** 质量 Quality：被 Dream 整合吞并后指向的存活记忆 memoId（""=未被吞并） */
+    val mergedInto: String = "",
+
     /** 质量 Quality：复用频率（检索命中自增） */
     val reuseCount: Int = 0,
 

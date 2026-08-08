@@ -1,124 +1,161 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:background="@color/brand_background">
 
     <LinearLayout
+        android:id="@+id/profileContent"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="14dp"
-        android:paddingEnd="14dp"
-        android:paddingTop="12dp"
-        android:paddingBottom="8dp">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="记忆画像"
-            android:textColor="?android:attr/textColorPrimary"
-            android:textSize="18sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/btnRegenerate"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/bg_badge"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp"
-            android:text="重新生成"
-            android:textColor="?attr/colorPrimary"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <TextView
-        android:id="@+id/tvProfileStatus"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:ellipsize="end"
-        android:maxLines="2"
-        android:paddingStart="14dp"
-        android:paddingEnd="14dp"
-        android:paddingBottom="8dp"
-        android:textColor="?android:attr/textColorSecondary"
-        android:textSize="11sp"
-        android:text="画像由 LLM 从本地树聚合生成；离线/失败自动统计降级，原因会显示在此" />
-
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:background="@color/brand_background">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:paddingBottom="24dp">
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="8dp">
 
-            <!-- 三板块：用户画像 / 风格偏好 / 工作项目 -->
-            <include
-                android:id="@+id/sectionProfile"
-                layout="@layout/section_profile" />
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="记忆画像"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="18sp"
+                android:textStyle="bold" />
 
-            <include
-                android:id="@+id/sectionStyle"
-                layout="@layout/section_profile" />
+            <TextView
+                android:id="@+id/btnRegenerate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_badge"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:text="重新生成"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
 
-            <include
-                android:id="@+id/sectionWork"
-                layout="@layout/section_profile" />
+        <TextView
+            android:id="@+id/tvProfileStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="8dp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="11sp"
+            android:text="画像由 LLM 从本地树聚合生成；离线/失败自动统计降级，原因会显示在此" />
 
-            <com.google.android.material.card.MaterialCardView
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                app:cardBackgroundColor="?attr/colorSurface"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="1dp">
+                android:orientation="vertical"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="24dp">
 
-                <LinearLayout
+                <!-- 三板块：用户画像 / 风格偏好 / 工作项目 -->
+                <include
+                    android:id="@+id/sectionProfile"
+                    layout="@layout/section_profile" />
+
+                <include
+                    android:id="@+id/sectionStyle"
+                    layout="@layout/section_profile" />
+
+                <include
+                    android:id="@+id/sectionWork"
+                    layout="@layout/section_profile" />
+
+                <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="14dp">
+                    android:layout_marginTop="8dp"
+                    app:cardBackgroundColor="?attr/colorSurface"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="1dp">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="遴选标签"
-                        android:textColor="?attr/colorPrimary"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvTags"
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:textColor="?android:attr/textColorSecondary"
-                        android:textSize="13sp" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
+                        android:orientation="vertical"
+                        android:padding="14dp">
 
-            <ProgressBar
-                android:id="@+id/pbProfile"
-                style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:indeterminate="true"
-                android:visibility="gone" />
-        </LinearLayout>
-    </ScrollView>
-</LinearLayout>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="遴选标签"
+                            android:textColor="?attr/colorPrimary"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvTags"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:textColor="?android:attr/textColorSecondary"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <ProgressBar
+                    android:id="@+id/pbProfile"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:indeterminate="true"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+
+    <!-- 阶段 4：AutoDream 联动画像 —— 全屏虚化覆盖 + 刷过动画（Dream 完成后换新画像） -->
+    <FrameLayout
+        android:id="@+id/dreamOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#E6FFFFFF"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <!-- 刷过亮条：从左侧外滑到右侧外，模拟"翻新" -->
+        <View
+            android:id="@+id/dreamSweepBar"
+            android:layout_width="140dp"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_dream_sweep" />
+
+        <TextView
+            android:id="@+id/dreamOverlayText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:lineSpacingExtra="6dp"
+            android:text="记忆正在做梦整合\n画像即将刷新"
+            android:textColor="#556677"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+    </FrameLayout>
+</FrameLayout>

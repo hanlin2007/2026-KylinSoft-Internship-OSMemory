@@ -42,7 +42,13 @@ data class CloudMemoryItemEntity(
     val evidenceRaw: String,
 
     /** 推送到云端的时间（毫秒） */
-    val syncedAt: Long
+    val syncedAt: Long,
+
+    /** Dream 状态（阶段 4 云端树 Dream）：0=活跃 1=陈旧 2=已归档（不删除，可恢复） */
+    val dreamState: Int = 0,
+
+    /** 被 Dream 整合吞并后指向的存活记忆 memoId（""=未被吞并） */
+    val mergedInto: String = ""
 ) {
     companion object {
         /** 来源：来自本地同步（memoId 沿用本地原值） */

@@ -1,6 +1,11 @@
 package com.example.osmemory.data
 
 import android.content.Context
+import com.example.osmemory.core.dream.CloudTreeOps
+import com.example.osmemory.core.dream.DreamEngine
+import com.example.osmemory.core.dream.DreamReport
+import com.example.osmemory.core.dream.DreamScheduler
+import com.example.osmemory.core.dream.LocalTreeOps
 import com.example.osmemory.core.model.ModelConfig
 import com.example.osmemory.core.model.CloudModelProvider
 import com.example.osmemory.core.model.ModelDiagnostics
@@ -19,6 +24,7 @@ import com.example.osmemory.data.db.entity.MemoryItemEntity
 import com.example.osmemory.data.db.entity.MemoryLogEntity
 import com.example.osmemory.data.db.entity.RegisteredAppEntity
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -46,7 +52,13 @@ class MemoryRepository(context: Context) {
     private lateinit var profileBuilder: ProfileBuilder
     private lateinit var syncManager: TreeSyncManager
 
-    private val _lastProfile = kotlinx.coroutines.flow.MutableStateFlow<ProfileBuilder.ProfileResult?>(null)
+    // AutoDream（阶段 4）：本地树整合用端侧算力（本地小模型），云端树整合用云端模型
+    private lateinit var localDreamEngine: DreamEngine
+    private lateinit var cloudDreamEngine: DreamEngine
+    private lateinit var dreamScheduler: DreamScheduler
+
+    private val _lastProfile = MutableStateFlow<ProfileBuilder.ProfileResult?>(null)
+    private val _lastDream = MutableStateFlow<DreamReport?>(null)
 
     init {
         NetworkMonitor.init(context)
@@ -61,6 +73,25 @@ class MemoryRepository(context: Context) {
         retriever = MemoryRetriever(itemDao, logDao, reranker)
         profileBuilder = ProfileBuilder(provider, itemDao, logDao)
         syncManager = TreeSyncManager(context, itemDao, cloudDao, logDao, provider)
+
+        // AutoDream 引擎：本地树（端侧算力）＋ 云端树（云端算力），互不越界
+        localDreamEngine = DreamEngine(
+            provider = ModelManager.localProvider(context),
+            ops = LocalTreeOps(itemDao, logDao),
+            logDao = logDao
+        )
+        cloudDreamEngine = DreamEngine(
+            provider = provider,
+            ops = CloudTreeOps(cloudDao, logDao),
+            logDao = logDao
+        )
+        dreamScheduler = DreamScheduler(
+            context = context,
+            dreamLocal = { dreamLocalNow() },
+            dreamCloud = { if (NetworkMonitor.isOnline(context)) dreamCloudNow() else null },
+            isOnline = { NetworkMonitor.isOnline(context) }
+        )
+        dreamScheduler.start()
     }
 
     /** 当前模型通道名（控制台展示） */
@@ -89,13 +120,48 @@ class MemoryRepository(context: Context) {
     /** 最近一次画像结果 */
     fun observeLastProfile(): StateFlow<ProfileBuilder.ProfileResult?> = _lastProfile
 
+    /** 最近一次 Dream 结果（AutoDream 联动画像用） */
+    fun observeLastDream(): StateFlow<DreamReport?> = _lastDream
+
+    // ---------- AutoDream（阶段 4：记忆自进化） ----------
+
+    /** 立即对本地树做一次 Dream（端侧算力；手动触发/离线周期用） */
+    suspend fun dreamLocalNow(): DreamReport {
+        val report = localDreamEngine.dream(online = NetworkMonitor.isOnline(context))
+        _lastDream.value = report
+        return report
+    }
+
+    /** 立即对云端树做一次 Dream（云端算力；整合结果不脱离云端树）。离线时不可达，返回 null。 */
+    suspend fun dreamCloudNow(): DreamReport? {
+        if (!NetworkMonitor.isOnline(context)) return null
+        val report = cloudDreamEngine.dream(online = true)
+        _lastDream.value = report
+        return report
+    }
+
+    /**
+     * 手动"立即 Dream"：按当前网络选择目标树——
+     * 在线：云端树 Dream（云端算力）；离线：本地树 Dream（端侧算力）。
+     * 返回 null 表示离线且云端不可达。
+     */
+    suspend fun dreamNow(): DreamReport? =
+        if (NetworkMonitor.isOnline(context)) dreamCloudNow() else dreamLocalNow()
+
+    /** 新记忆入库后通知调度器（在线时后台异步快速触发一次云端树 Dream） */
+    fun notifyNewMemoryArrived() = dreamScheduler.notifyNewMemory()
+
     // ---------- 记忆写入（memo_collect） ----------
 
     suspend fun collect(
         memoryText: String,
         source: String,
         appId: String = MemoryPipeline.CONSOLE_APP_ID
-    ): MemoryPipeline.CollectResult = pipeline.collect(memoryText, source, appId)
+    ): MemoryPipeline.CollectResult {
+        val result = pipeline.collect(memoryText, source, appId)
+        if (result is MemoryPipeline.CollectResult.Success) notifyNewMemoryArrived()
+        return result
+    }
 
     /** 记忆修改（先画像后改）：保留 memoId，重跑流水线，敏感项可强制保密隔离 */
     suspend fun updateItem(

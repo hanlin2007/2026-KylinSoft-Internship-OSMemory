@@ -226,7 +226,10 @@ class MemoryPipeline(
             evidenceRaw = text,
             cloudEligible = cloudEligible,
             syncState = if (sensitive || !cloudEligible) SYNC_LOCAL_ONLY else SYNC_PENDING,
-            syncedAt = null
+            syncedAt = null,
+            // 编辑已归档（被 Dream 吞并）的记忆 = 用户主动恢复为活跃记忆
+            dreamState = 0,
+            mergedInto = ""
         )
         itemDao.update(updated)
 

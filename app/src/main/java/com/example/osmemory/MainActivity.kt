@@ -16,6 +16,7 @@ import com.example.osmemory.data.MemoryService
 import com.example.osmemory.ui.log.LogFragment
 import com.example.osmemory.ui.memory.MemoryListFragment
 import com.example.osmemory.ui.profile.ProfileFragment
+import com.example.osmemory.ui.settings.DreamSettingsFragment
 import com.example.osmemory.ui.settings.ModelSettingsFragment
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.bottomnavigation.BottomNavigationView
@@ -74,6 +75,10 @@ class MainActivity : AppCompatActivity() {
                 R.id.action_model_settings -> {
                     drawerLayout.closeDrawer(GravityCompat.START)
                     showFragment(ModelSettingsFragment.newInstance())
+                }
+                R.id.action_dream_settings -> {
+                    drawerLayout.closeDrawer(GravityCompat.START)
+                    showFragment(DreamSettingsFragment.newInstance())
                 }
                 R.id.action_audit_export -> {
                     drawerLayout.closeDrawer(GravityCompat.START)
