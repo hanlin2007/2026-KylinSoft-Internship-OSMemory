@@ -68,6 +68,11 @@ class ProfileBuilder(
         // 统计降级用：全库最高频标签
         val fallbackTags = topTags(used, 8)
 
+        // 记忆太少 → 不浪费 LLM 调用，直接给可操作的提示
+        if (used.size <= 5) {
+            return buildLowCountProfile(now, used.size, fallbackTags, appId)
+        }
+
         val aiResult = runCatching {
             provider.complete(SYSTEM_PROMPT, buildUserPrompt(profileItems, styleItems, workItems), 0.3)
         }
@@ -76,14 +81,18 @@ class ProfileBuilder(
             try {
                 val parsed = parse(aiResult.getOrThrow())
                 val tags = parsed.tags.ifEmpty { fallbackTags }
-                logProfile(now, used, degraded = false, reason = "", tags = tags, appId = appId)
+                // 若模型仍未给出任一维度，标注记忆过少建议
+                val hint = if (parsed.userProfile.isBlank() || parsed.stylePreference.isBlank() || parsed.workProject.isBlank()) {
+                    "（提示：当前记忆数量较少，部分维度分析有限。继续沉淀更多维度记忆后画像会更完整）"
+                } else ""
+                logProfile(now, used, degraded = false, reason = hint, tags = tags, appId = appId)
                 ProfileResult(
-                    userProfile = parsed.userProfile,
-                    stylePreference = parsed.stylePreference,
-                    workProject = parsed.workProject,
+                    userProfile = parsed.userProfile.ifBlank { "记忆已高维度整合，当前可聚合记忆较少，建议在「用户画像」相关维度继续沉淀更多日常信息。" },
+                    stylePreference = parsed.stylePreference.ifBlank { "记忆已高维度整合，当前可聚合记忆较少，建议在「偏好风格」相关维度继续沉淀更多偏好记录。" },
+                    workProject = parsed.workProject.ifBlank { "记忆已高维度整合，当前可聚合记忆较少，建议在「项目上下文」「任务轨迹」相关维度继续沉淀更多工作记录。" },
                     tags = tags,
                     source = "ai",
-                    reason = "",
+                    reason = hint,
                     usedCount = used.size,
                     at = now
                 )
@@ -93,6 +102,28 @@ class ProfileBuilder(
         } else {
             buildFallback(now, profileItems, styleItems, workItems, used, fallbackTags, aiResult.exceptionOrNull()?.message ?: "未知错误", appId)
         }
+    }
+
+    /** 记忆数量极低（≤5 条）：不调 LLM，直接返回可操作提示。 */
+    private suspend fun buildLowCountProfile(
+        now: Long,
+        count: Int,
+        fallbackTags: List<String>,
+        appId: String
+    ): ProfileResult {
+        val hint = "记忆已高维度整合，当前记忆总数仅 $count 条，建议在各维度继续沉淀更多日常记忆（用户画像/偏好风格/项目上下文），积累至 10 条以上再生成画像。"
+        val result = ProfileResult(
+            userProfile = hint,
+            stylePreference = "同上：记忆总数仅 $count 条，风格偏好维度暂无足够样本。",
+            workProject = "同上：记忆总数仅 $count 条，工作项目维度暂无足够样本。",
+            tags = fallbackTags.ifEmpty { listOf("记忆积攒中") },
+            source = "fallback",
+            reason = "记忆不足（$count 条，阈值 5）",
+            usedCount = count,
+            at = now
+        )
+        logProfile(now, emptyList(), degraded = true, reason = result.reason, tags = result.tags, appId = appId)
+        return result
     }
 
     private suspend fun buildFallback(
@@ -161,9 +192,9 @@ class ProfileBuilder(
             ?: throw IllegalStateException("画像回复中未找到合法 JSON：${rawReply.take(150)}")
         val json = JSONObject(jsonText)
         return Parsed(
-            userProfile = JsonTools.optString(json, "userProfile", "").ifBlank { "（模型未给出该维度总结）" },
-            stylePreference = JsonTools.optString(json, "stylePreference", "").ifBlank { "（模型未给出该维度总结）" },
-            workProject = JsonTools.optString(json, "workProject", "").ifBlank { "（模型未给出该维度总结）" },
+            userProfile = JsonTools.optString(json, "userProfile", "").trim(),
+            stylePreference = JsonTools.optString(json, "stylePreference", "").trim(),
+            workProject = JsonTools.optString(json, "workProject", "").trim(),
             tags = JsonTools.optStringArray(json, "tags")
         )
     }

@@ -30,6 +30,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -73,6 +74,8 @@ class MemoryRepository(context: Context) {
 
     private val _lastProfile = MutableStateFlow<ProfileBuilder.ProfileResult?>(null)
     private val _lastDream = MutableStateFlow<DreamReport?>(null)
+    private val _dreamEvent = MutableSharedFlow<DreamReport>()
+    private val _dreamInProgress = MutableStateFlow(false)
     private val pendingDreamChange = AtomicReference<DreamReport?>(null)
 
     /** 端侧模型后台自动下载进度（首次启动触发；设置页实时展示） */
@@ -174,6 +177,9 @@ class MemoryRepository(context: Context) {
     /** 最近一次 Dream 结果（AutoDream 联动画像用） */
     fun observeLastDream(): StateFlow<DreamReport?> = _lastDream
 
+    /** Dream 一次性事件（仅实际的 Dream 完成时发送，StateFlow 旧值不重放） */
+    fun observeDreamEvent(): Flow<DreamReport> = _dreamEvent
+
     // ---------- AutoDream（阶段 4：记忆自进化） ----------
 
     /**
@@ -242,6 +248,7 @@ class MemoryRepository(context: Context) {
             current
         }
         _lastDream.value = displayed
+        if (displayed.changed) _dreamEvent.tryEmit(displayed)
         return displayed
     }
 
@@ -256,18 +263,23 @@ class MemoryRepository(context: Context) {
     ): List<DreamReport> =
         dreamCycleMutex.withLock {
             if (!shouldRun()) return@withLock emptyList()
-            val reports = mutableListOf(dreamLocalNow(publish = false))
-            if (includeCloud && NetworkMonitor.isOnline(context)) {
-                // 先把本地 Dream 结果（含归档状态）推送到云端，再整合云端树。
-                ensureCloudIntegrated()
-                dreamCloudNow(publish = false)?.let(reports::add)
+            _dreamInProgress.value = true
+            try {
+                val reports = mutableListOf(dreamLocalNow(publish = false))
+                if (includeCloud && NetworkMonitor.isOnline(context)) {
+                    // 先把本地 Dream 结果（含归档状态）推送到云端，再整合云端树。
+                    ensureCloudIntegrated()
+                    dreamCloudNow(publish = false)?.let(reports::add)
+                }
+                // 与整轮写入共用临界区，防止手动 waiter 抢在 AutoDream 发布前得到”稳定”报告。
+                if (publishScheduled) publishDreamReports(reports)
+                reports
+            } finally {
+                _dreamInProgress.value = false
             }
-            // 与整轮写入共用临界区，防止手动 waiter 抢在 AutoDream 发布前得到“稳定”报告。
-            if (publishScheduled) publishDreamReports(reports)
-            reports
         }
 
-    /** AutoDream 在本地与云端都完成后只发布一次，避免云端“无变化”覆盖本地合并明细。 */
+    /** AutoDream 在本地与云端都完成后只发布一次，避免云端”无变化”覆盖本地合并明细。 */
     private fun publishDreamReports(reports: List<DreamReport>) {
         if (reports.isEmpty()) return
         val current = reports.toCombinedDreamReport()
@@ -277,7 +289,9 @@ class MemoryRepository(context: Context) {
         }
         if (recentChange == null) pendingDreamChange.set(null)
         // 稳定轮次不抹掉尚待控制台展示的最近变更；手动 Dream 会消费这份报告。
-        _lastDream.value = if (!current.changed && recentChange != null) recentChange else current
+        val displayed = if (!current.changed && recentChange != null) recentChange else current
+        _lastDream.value = displayed
+        if (displayed.changed) _dreamEvent.tryEmit(displayed)
     }
 
     private fun List<DreamReport>.toCombinedDreamReport(): DreamReport =
@@ -291,6 +305,7 @@ class MemoryRepository(context: Context) {
         mergedCount = reports.sumOf { it.mergedCount },
         distilledCount = reports.sumOf { it.distilledCount },
         archivedCount = reports.sumOf { it.archivedCount },
+        deletedCount = reports.sumOf { it.deletedCount },
         message = reports.joinToString("；") { it.message },
         degraded = reports.any { it.degraded },
         reason = reports.map { it.reason }.filter { it.isNotBlank() }.distinct().joinToString("；"),

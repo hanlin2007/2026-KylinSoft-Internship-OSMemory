@@ -147,6 +147,15 @@
             android:layout_height="0dp"
             android:layout_weight="1">
 
+            <ProgressBar
+                android:id="@+id/pbDreamProgress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="3dp"
+                android:indeterminate="true"
+                android:visibility="gone"
+                android:indeterminateTint="@color/semantic_normal" />
+
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rvMemory"
                 android:layout_width="match_parent"
@@ -227,7 +236,7 @@
         android:id="@+id/dreamScanOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#B2F0F4F8"
+        android:background="#D9F0F4F8"
         android:visibility="gone"
         android:clickable="true"
         android:focusable="true">
@@ -238,7 +247,6 @@
             android:layout_gravity="center"
             android:gravity="center"
             android:orientation="vertical"
-            android:background="@drawable/bg_dream_toast"
             android:paddingStart="28dp"
             android:paddingEnd="28dp"
             android:paddingTop="22dp"
@@ -259,7 +267,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:gravity="center"
-                android:textColor="#607D8B"
+                android:textColor="#37474F"
                 android:textSize="13sp" />
 
         </LinearLayout>

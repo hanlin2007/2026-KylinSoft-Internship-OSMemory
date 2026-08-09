@@ -103,7 +103,40 @@ object DreamRules {
         return normA.isNotEmpty() && normA == normB
     }
 
-    private fun normalizedSimilarity(normA: String, normB: String): Float {
+    // ---------- 预计算辅助（供 DreamEngine 候选对循环复用，避免 O(n²) 重复归一化） ----------
+
+    /** 标签字符串 → 归一化集合 */
+    fun tagSet(raw: String): Set<String> = raw.split(",", "，")
+        .map { it.trim().lowercase() }
+        .filter { it.isNotBlank() }
+        .toSet()
+
+    /** 内容归一化（去空白/标点/小写后的纯文本） */
+    fun normalizeContent(text: String): String = normalize(text)
+
+    /** 主题归一化（剥离立场词后的文本） */
+    fun normalizeTopicContent(text: String): String = normalizeTopic(text)
+
+    /** 精确合并归一化 */
+    fun normalizeForExactContent(text: String): String = normalizeForExactMerge(text)
+
+    /** 归一化后的 bigram Jaccard 相似度 */
+    fun normalizedSimilarity(normA: String, normB: String): Float = normalizedSimilarityImpl(normA, normB)
+
+    /** 基于预计算值的 mergeCompatible 判定（避免重复解析） */
+    fun mergeCompatiblePre(
+        aNegated: Boolean, bNegated: Boolean,
+        aPolarity: Int, bPolarity: Int,
+        aFactTokens: List<String>, bFactTokens: List<String>
+    ): Boolean {
+        if (aNegated != bNegated) return false
+        if (aPolarity == POSITIVE && bPolarity == NEGATIVE ||
+            aPolarity == NEGATIVE && bPolarity == POSITIVE
+        ) return false
+        return aFactTokens == bFactTokens
+    }
+
+    private fun normalizedSimilarityImpl(normA: String, normB: String): Float {
         if (normA.isEmpty() || normB.isEmpty()) return 0f
         if (normA == normB) return 1f
         val gramsA = bigrams(normA)
@@ -139,8 +172,10 @@ object DreamRules {
         return normalized.replace(GENERIC_NEGATION, "")
     }
 
-    /** 保留事实值出现顺序与次数，避免“4GB/128GB”字段互换后仍被当作同一集合。 */
-    private fun factTokens(text: String): List<String> = FACT_TOKEN.findAll(text.lowercase())
+    /** 保留事实值出现顺序与次数，避免”4GB/128GB”字段互换后仍被当作同一集合。 */
+    fun factTokens(text: String): List<String> = factTokensImpl(text)
+
+    private fun factTokensImpl(text: String): List<String> = FACT_TOKEN.findAll(text.lowercase())
         .map { it.value.replace(Regex("\\s+"), "") }
         .toList()
 

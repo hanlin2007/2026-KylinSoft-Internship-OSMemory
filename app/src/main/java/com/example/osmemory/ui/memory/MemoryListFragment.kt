@@ -100,6 +100,7 @@ class MemoryListFragment : Fragment() {
         observeStatus(view)
         observeTrees()
         observeDream(view)
+        observeDreamProgress(view)
 
         // 空态文案默认本地树
         updateEmpty(view)
@@ -217,19 +218,28 @@ class MemoryListFragment : Fragment() {
 
     /**
      * 观察 Dream 完成事件，仅在用户已回到记忆主页且 Dream 确实已完成时触发扫描特效。
-     * 条件：已变更 + 时间戳已更新 + 非过期缓存 + 用户当前在本地树页面。
+     * 使用一次性 SharedFlow 确保每次 Dream 只触发一次动画，StateFlow 旧值不重放。
+     * 条件：已变更 + 用户当前在本地树页面。
      */
     private fun observeDream(root: View) {
         viewLifecycleOwner.lifecycleScope.launch {
-            repo.observeLastDream().collect { report ->
-                if (report == null || sweepPlaying || currentTree != "LOCAL" ||
+            repo.observeDreamEvent().collect { report ->
+                if (sweepPlaying || currentTree != "LOCAL" ||
                     searchResults != null || !report.changed) return@collect
-                // Dream 至少完成 1 秒后，当前时间晚于报告时间才算真正完成
                 val now = System.currentTimeMillis()
                 if (report.at <= 0L || report.at >= now - 500L) return@collect
                 if (report.at <= lastConsumedDreamAt) return@collect
                 lastConsumedDreamAt = report.at
                 playDreamScanEffect(root, report)
+            }
+        }
+    }
+
+    /** 观察 Dream 执行中状态，显示/隐藏顶部进度条 */
+    private fun observeDreamProgress(root: View) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            repo.observeDreamInProgress().collect { inProgress ->
+                root.findViewById<ProgressBar>(R.id.pbDreamProgress)?.isVisible = inProgress
             }
         }
     }
