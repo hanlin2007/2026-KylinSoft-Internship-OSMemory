@@ -1,221 +1,269 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/brand_background">
+    android:layout_height="match_parent">
 
-    <!-- 网络状态条（在线/离线 + 云端树可达 + 模型最近调用） -->
+    <!-- 原有内容 -->
     <LinearLayout
-        android:id="@+id/layoutStatusBar"
+        android:id="@+id/memoryContent"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingStart="14dp"
-        android:paddingEnd="14dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp">
+        android:background="@color/brand_background">
 
         <LinearLayout
+            android:id="@+id/layoutStatusBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/tvNetworkBadge"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_badge"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:paddingTop="3dp"
-                android:paddingBottom="3dp"
-                android:textSize="11sp"
-                tools:text="在线" />
-
-            <TextView
-                android:id="@+id/tvCloudStatus"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:layout_weight="1"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:textColor="?android:attr/textColorSecondary"
-                android:textSize="12sp"
-                tools:text="Cloud Tree 可达 · 最近同步：成功" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/tvModelStatus"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="?android:attr/textColorSecondary"
-            android:textSize="11sp"
-            tools:text="模型通道：云端大模型 · 最近调用成功" />
-    </LinearLayout>
-
-    <!-- 语义检索框（阶段 2：关键词召回 + LLM 重排） -->
-    <LinearLayout
-        android:id="@+id/layoutSearch"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingStart="14dp"
-        android:paddingEnd="14dp"
-        android:paddingBottom="8dp">
-
-        <EditText
-            android:id="@+id/etSearch"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:background="@drawable/bg_badge"
-            android:hint="语义检索记忆…（回车搜索，空则回到树视图）"
-            android:imeOptions="actionSearch"
-            android:inputType="text"
-            android:maxLines="1"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp"
-            android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/btnSearch"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:background="@drawable/bg_badge"
+            android:orientation="vertical"
             android:paddingStart="14dp"
             android:paddingEnd="14dp"
             android:paddingTop="8dp"
-            android:paddingBottom="8dp"
-            android:text="检索"
-            android:textColor="?attr/colorPrimary"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:paddingBottom="8dp">
 
-        <TextView
-            android:id="@+id/btnSearchClear"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:background="@drawable/bg_badge"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp"
-            android:text="✕"
-            android:textColor="?android:attr/textColorSecondary"
-            android:textSize="14sp" />
-    </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-    <!-- 双树切换（Local Tree / Cloud Tree） -->
-    <com.google.android.material.tabs.TabLayout
-        android:id="@+id/treeTabs"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="?attr/colorSurface"
-        app:tabIndicatorColor="?attr/colorPrimary"
-        app:tabMode="fixed"
-        app:tabSelectedTextColor="?attr/colorPrimary"
-        app:tabTextColor="?android:attr/textColorSecondary">
+                <TextView
+                    android:id="@+id/tvNetworkBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_badge"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingTop="3dp"
+                    android:paddingBottom="3dp"
+                    android:textSize="11sp"
+                    tools:text="在线" />
 
-        <com.google.android.material.tabs.TabItem
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="本地树" />
-
-        <com.google.android.material.tabs.TabItem
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="云端树" />
-    </com.google.android.material.tabs.TabLayout>
-
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rvMemory"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:paddingBottom="88dp"
-            android:scrollbars="vertical" />
-
-        <TextView
-            android:id="@+id/tvEmpty"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:gravity="center"
-            android:lineSpacingExtra="4dp"
-            android:textColor="?android:attr/textColorSecondary"
-            android:textSize="14sp"
-            android:visibility="gone" />
-
-        <ProgressBar
-            android:id="@+id/pbLoading"
-            style="?android:attr/progressBarStyleLarge"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:visibility="gone" />
-
-        <!-- 云端树断网锁定遮罩：白色虚化 + 中央锁 + 提示（阶段 2 修复 v2） -->
-        <LinearLayout
-            android:id="@+id/cloudLockOverlay"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="#F5FFFFFF"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:visibility="gone">
-
-            <ImageView
-                android:layout_width="72dp"
-                android:layout_height="72dp"
-                android:contentDescription="云端树已锁定"
-                android:src="@drawable/ic_lock" />
+                <TextView
+                    android:id="@+id/tvCloudStatus"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:textSize="12sp"
+                    tools:text="Cloud Tree 可达 · 最近同步：成功" />
+            </LinearLayout>
 
             <TextView
+                android:id="@+id/tvModelStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textSize="11sp"
+                tools:text="模型通道：云端大模型 · 最近调用成功" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/layoutSearch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="8dp">
+
+            <EditText
+                android:id="@+id/etSearch"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@drawable/bg_badge"
+                android:hint="语义检索记忆…（回车搜索，空则回到树视图）"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:maxLines="1"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/btnSearch"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="18dp"
-                android:text="当前为离线状态，云端树无法查看"
-                android:textColor="#37474F"
-                android:textSize="15sp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_badge"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:text="检索"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="14sp"
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/btnSearchClear"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:background="@drawable/bg_badge"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:text="✕"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <com.google.android.material.tabs.TabLayout
+            android:id="@+id/treeTabs"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?attr/colorSurface"
+            app:tabIndicatorColor="?attr/colorPrimary"
+            app:tabMode="fixed"
+            app:tabSelectedTextColor="?attr/colorPrimary"
+            app:tabTextColor="?android:attr/textColorSecondary">
+
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="本地树" />
+
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="云端树" />
+        </com.google.android.material.tabs.TabLayout>
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvMemory"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingBottom="88dp"
+                android:scrollbars="vertical" />
+
+            <TextView
+                android:id="@+id/tvEmpty"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:lineSpacingExtra="4dp"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textSize="14sp"
+                android:visibility="gone" />
+
+            <ProgressBar
+                android:id="@+id/pbLoading"
+                style="?android:attr/progressBarStyleLarge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/cloudLockOverlay"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#F5FFFFFF"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <ImageView
+                    android:layout_width="72dp"
+                    android:layout_height="72dp"
+                    android:contentDescription="云端树已锁定"
+                    android:src="@drawable/ic_lock" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:text="当前为离线状态，云端树无法查看"
+                    android:textColor="#37474F"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center"
+                    android:lineSpacingExtra="4dp"
+                    android:text="Network Gateway 断开\n内网记忆不可离线、不可脱离，联网后自动恢复"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fabAdd"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="20dp"
+            android:contentDescription="添加记忆"
+            android:src="@drawable/ic_add"
+            app:tint="?attr/colorOnPrimary" />
+
+    </LinearLayout>
+
+    <!-- Dream 完成通知：毛玻璃虚化 + 淡入淡出 -->
+    <FrameLayout
+        android:id="@+id/dreamScanOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#B2F0F4F8"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:background="@drawable/bg_dream_toast"
+            android:paddingStart="28dp"
+            android:paddingEnd="28dp"
+            android:paddingTop="22dp"
+            android:paddingBottom="22dp">
+
+            <TextView
+                android:id="@+id/dreamScanLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Dream 记忆已更新"
+                android:textColor="#1A1A2E"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/dreamScanDetail"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:gravity="center"
-                android:lineSpacingExtra="4dp"
-                android:text="Network Gateway 断开\n内网记忆不可离线、不可脱离，联网后自动恢复"
-                android:textColor="?android:attr/textColorSecondary"
-                android:textSize="12sp" />
+                android:textColor="#607D8B"
+                android:textSize="13sp" />
+
         </LinearLayout>
+
     </FrameLayout>
 
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabAdd"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
-        android:layout_margin="20dp"
-        android:contentDescription="添加记忆"
-        android:src="@drawable/ic_add"
-        app:tint="?attr/colorOnPrimary" />
-
-</LinearLayout>
+</FrameLayout>

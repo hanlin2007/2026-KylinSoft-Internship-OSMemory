@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ProgressBar
 import android.widget.Spinner
 import android.widget.TextView
@@ -18,6 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.osmemory.R
+import com.example.osmemory.core.dream.DreamReport
 import com.example.osmemory.core.pipeline.MemoryPipeline
 import com.example.osmemory.data.MemoryRepository
 import com.example.osmemory.data.MemoryService
@@ -67,6 +69,10 @@ class MemoryListFragment : Fragment() {
 
     private var online = false
 
+    /** Dream 扫描特效守卫：已消费的最新 Dream 时间戳 + 播放中防重入 */
+    private var lastConsumedDreamAt = 0L
+    private var sweepPlaying = false
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -93,6 +99,7 @@ class MemoryListFragment : Fragment() {
         setupSearch(view)
         observeStatus(view)
         observeTrees()
+        observeDream(view)
 
         // 空态文案默认本地树
         updateEmpty(view)
@@ -204,6 +211,68 @@ class MemoryListFragment : Fragment() {
                 if (searchResults == null && currentTree == "CLOUD") render(view ?: return@collect)
             }
         }
+    }
+
+    // ---------- Dream 扫描特效 ----------
+
+    /**
+     * 观察 Dream 完成事件，仅在用户已回到记忆主页且 Dream 确实已完成时触发扫描特效。
+     * 条件：已变更 + 时间戳已更新 + 非过期缓存 + 用户当前在本地树页面。
+     */
+    private fun observeDream(root: View) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            repo.observeLastDream().collect { report ->
+                if (report == null || sweepPlaying || currentTree != "LOCAL" ||
+                    searchResults != null || !report.changed) return@collect
+                // Dream 至少完成 1 秒后，当前时间晚于报告时间才算真正完成
+                val now = System.currentTimeMillis()
+                if (report.at <= 0L || report.at >= now - 500L) return@collect
+                if (report.at <= lastConsumedDreamAt) return@collect
+                lastConsumedDreamAt = report.at
+                playDreamScanEffect(root, report)
+            }
+        }
+    }
+
+    /**
+     * 播放 Dream 完成通知：毛玻璃虚化淡入 → 屏幕中心显示 "Dream 记忆已更新" →
+     * 停留 1.5 秒 → 虚化淡出。
+     */
+    private fun playDreamScanEffect(root: View, report: DreamReport) {
+        if (sweepPlaying) return
+        sweepPlaying = true
+
+        val overlay = root.findViewById<FrameLayout>(R.id.dreamScanOverlay)
+        val label = overlay.findViewById<TextView>(R.id.dreamScanLabel)
+        val detail = overlay.findViewById<TextView>(R.id.dreamScanDetail)
+
+        // 更新文字
+        label.text = "Dream 记忆已更新"
+        detail.text = buildString {
+            if (report.conflictsResolved > 0) append("冲突消解 ${report.conflictsResolved}  ")
+            if (report.splitCount > 0) append("拆分 ${report.splitCount}  ")
+            if (report.mergedCount > 0) append("合并 ${report.mergedCount}  ")
+            if (report.distilledCount > 0) append("高维提炼 ${report.distilledCount}")
+        }.trim()
+
+        // 1. 毛玻璃遮罩淡入（300ms）
+        overlay.alpha = 0f
+        overlay.visibility = View.VISIBLE
+        overlay.animate()
+            .alpha(1f)
+            .setDuration(300)
+            .withEndAction {
+                // 2. 停留 1500ms → 虚化淡出（500ms）
+                overlay.postDelayed({
+                    overlay.animate()
+                        .alpha(0f)
+                        .setDuration(500)
+                        .withEndAction {
+                            overlay.visibility = View.GONE
+                            sweepPlaying = false
+                        }.start()
+                }, 1500)
+            }.start()
     }
 
     // ---------- 语义检索（阶段 2） ----------
