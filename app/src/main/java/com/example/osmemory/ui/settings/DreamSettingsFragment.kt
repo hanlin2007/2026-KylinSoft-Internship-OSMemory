@@ -123,7 +123,9 @@ class DreamSettingsFragment : Fragment() {
         tv.isVisible = true
         val summary = buildString {
             append("${report.tree} 树 · ${TIME_FORMAT.format(Date(report.at))}\n")
-            append("冲突消解 ${report.conflictsResolved} · 拆分 ${report.splitCount} · 合并 ${report.mergedCount} · 高维提炼 ${report.distilledCount} · 归档 ${report.archivedCount}\n")
+            append("冲突消解 ${report.conflictsResolved} · 拆分 ${report.splitCount} · 合并 ${report.mergedCount} · 高维提炼 ${report.distilledCount} · 归档 ${report.archivedCount}")
+            if (report.deletedCount > 0) append(" · 遗忘删除 ${report.deletedCount}")
+            append('\n')
             if (report.details.isNotEmpty()) {
                 append(report.details.take(8).joinToString("\n") { "• $it" })
                 append('\n')

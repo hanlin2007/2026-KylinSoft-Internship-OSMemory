@@ -26,7 +26,7 @@ import com.example.osmemory.data.db.entity.RegisteredAppEntity
         MemoryLogEntity::class,
         RegisteredAppEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class OSMemoryDatabase : RoomDatabase() {
@@ -56,6 +56,14 @@ abstract class OSMemoryDatabase : RoomDatabase() {
             }
         }
 
+        /** v3 → v4：AutoDream 不活跃遗忘：最近检索引用时间 + 不活跃周期计数 */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE memory_items ADD COLUMN lastRetrievedAt INTEGER")
+                db.execSQL("ALTER TABLE memory_items ADD COLUMN inactiveDreamCycles INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun get(context: Context): OSMemoryDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -63,7 +71,7 @@ abstract class OSMemoryDatabase : RoomDatabase() {
                     OSMemoryDatabase::class.java,
                     "osmemory.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build().also { INSTANCE = it }
             }
     }

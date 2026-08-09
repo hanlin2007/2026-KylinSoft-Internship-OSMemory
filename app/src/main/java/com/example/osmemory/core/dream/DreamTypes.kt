@@ -84,6 +84,8 @@ data class DreamReport(
     val distilledCount: Int,
     /** 归档条数（被覆盖/被合并/被包含，可恢复） */
     val archivedCount: Int,
+    /** 不活跃遗忘删除条数（≥3 个 Dream 周期无检索/推理 → 物理删除） */
+    val deletedCount: Int,
     val message: String,
     val degraded: Boolean,
     val reason: String,
@@ -97,7 +99,7 @@ data class DreamReport(
 
     val changed: Boolean
         get() = conflictsResolved > 0 || splitCount > 0 || mergedCount > 0 ||
-            distilledCount > 0 || archivedCount > 0
+            distilledCount > 0 || archivedCount > 0 || deletedCount > 0
 }
 
 /** 树写入抽象：Dream 引擎通过它读写任一树（云端 Dream 结果不脱离云端树） */
@@ -108,6 +110,18 @@ interface TreeOps {
     suspend fun update(item: DreamItem)
     suspend fun insert(item: DreamItem): String
     suspend fun archive(item: DreamItem, mergedInto: String)
+
+    /** 上一轮 Dream 时间戳（毫秒，0=从未运行） */
+    suspend fun lastDreamTimestamp(): Long
+
+    /** 递增所有在 [lastDreamAt] 之后未被引用的记忆的不活跃周期计数 */
+    suspend fun incrementInactiveCycles(lastDreamAt: Long)
+
+    /** 返回不活跃周期 ≥ [minCycles] 的活跃记忆 memoId 列表 */
+    suspend fun staleMemoIds(minCycles: Int): List<String>
+
+    /** 物理删除不活跃周期 ≥3 的活跃记忆，返回删除条数 */
+    suspend fun deleteStaleInactive(): Int
 }
 
 /**

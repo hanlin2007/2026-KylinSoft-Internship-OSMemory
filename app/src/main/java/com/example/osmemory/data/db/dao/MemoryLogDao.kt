@@ -25,4 +25,8 @@ interface MemoryLogDao {
 
     @Query("DELETE FROM memory_logs")
     suspend fun deleteAll()
+
+    /** 最近一次指定类型的日志时间戳（AutoDream 遗忘判断用） */
+    @Query("SELECT COALESCE(MAX(timestamp), 0) FROM memory_logs WHERE logType = :type")
+    suspend fun lastTimestamp(type: String): Long
 }

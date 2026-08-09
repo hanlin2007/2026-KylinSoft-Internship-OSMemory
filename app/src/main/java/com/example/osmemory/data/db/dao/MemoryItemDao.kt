@@ -103,4 +103,25 @@ interface MemoryItemDao {
             "ORDER BY createdAt DESC LIMIT :limit"
     )
     suspend fun byCategory(category: String, limit: Int = 50): List<MemoryItemEntity>
+
+    /** 标记最近检索引用时间（检索命中 / 推理引用时同步更新，供 AutoDream 遗忘判断） */
+    @Query("UPDATE memory_items SET lastRetrievedAt = :ts, inactiveDreamCycles = 0 WHERE memoId = :memoId")
+    suspend fun markRetrieved(memoId: String, ts: Long)
+
+    /** 递增不活跃周期计数（Dream 每轮调用），返回受影响的条数 */
+    @Query(
+        """
+        UPDATE memory_items SET inactiveDreamCycles = inactiveDreamCycles + 1
+        WHERE dreamState = 0 AND (:lastDreamAt = 0 OR lastRetrievedAt IS NULL OR lastRetrievedAt < :lastDreamAt)
+        """
+    )
+    suspend fun incrementInactiveCycles(lastDreamAt: Long): Int
+
+    /** 删除不活跃周期 ≥3 的活跃记忆（物理删除，不再可恢复），返回删除条数 */
+    @Query("DELETE FROM memory_items WHERE dreamState = 0 AND inactiveDreamCycles >= 3")
+    suspend fun deleteStaleInactive(): Int
+
+    /** 重置所有不活跃周期计数（有新检索引用的项目已在 markRetrieved 中单独重置） */
+    @Query("UPDATE memory_items SET inactiveDreamCycles = 0 WHERE dreamState = 0")
+    suspend fun resetAllInactiveCycles()
 }

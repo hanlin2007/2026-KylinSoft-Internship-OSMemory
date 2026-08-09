@@ -64,8 +64,11 @@ class MemoryRetriever(
             result = result.take(limit)
         }
 
-        // 命中自增（复用频率 / 质量字段）
-        result.forEach { itemDao.bumpReuseCount(it.id) }
+        // 命中自增（复用频率 / 质量字段）+ 检索引用时间（AutoDream 遗忘判断）
+        result.forEach {
+            itemDao.bumpReuseCount(it.id)
+            itemDao.markRetrieved(it.memoId, now)
+        }
 
         // 安全敏感性日志：命中敏感记忆（policyLevel=2）时留痕（仅"敏感"标签内容）
         val sensitiveHits = result.filter { it.policyLevel >= 2 }

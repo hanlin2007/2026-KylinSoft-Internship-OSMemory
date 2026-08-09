@@ -229,6 +229,7 @@ class MemoryListFragment : Fragment() {
                 val now = System.currentTimeMillis()
                 if (report.at <= 0L || report.at >= now - 500L) return@collect
                 if (report.at <= lastConsumedDreamAt) return@collect
+                if (!repo.claimDreamEffect(report.at)) return@collect
                 lastConsumedDreamAt = report.at
                 playDreamScanEffect(root, report)
             }
@@ -283,6 +284,15 @@ class MemoryListFragment : Fragment() {
                         }.start()
                 }, 1500)
             }.start()
+    }
+
+    override fun onDestroyView() {
+        view?.findViewById<FrameLayout>(R.id.dreamScanOverlay)?.apply {
+            animate().cancel()
+            visibility = View.GONE
+        }
+        sweepPlaying = false
+        super.onDestroyView()
     }
 
     // ---------- 语义检索（阶段 2） ----------

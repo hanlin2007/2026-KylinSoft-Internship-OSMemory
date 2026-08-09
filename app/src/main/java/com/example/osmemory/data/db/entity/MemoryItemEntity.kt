@@ -94,5 +94,11 @@ data class MemoryItemEntity(
     val syncState: Int = 0,
 
     /** 最近一次成功同步到云端的时间（毫秒，null=从未同步） */
-    val syncedAt: Long? = null
+    val syncedAt: Long? = null,
+
+    /** 最近一次被检索（RETRIEVE）或推理（INFER）引用的时间（毫秒，null=从未被引用） */
+    val lastRetrievedAt: Long? = null,
+
+    /** AutoDream 不活跃周期计数：每轮 Dream 未检测到检索/推理引用则 +1，≥3 触发物理删除 */
+    val inactiveDreamCycles: Int = 0
 )

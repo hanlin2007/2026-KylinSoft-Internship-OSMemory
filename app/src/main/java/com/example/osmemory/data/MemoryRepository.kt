@@ -74,7 +74,10 @@ class MemoryRepository(context: Context) {
 
     private val _lastProfile = MutableStateFlow<ProfileBuilder.ProfileResult?>(null)
     private val _lastDream = MutableStateFlow<DreamReport?>(null)
-    private val _dreamEvent = MutableSharedFlow<DreamReport>()
+    // 保留最近一次完成事件，用户当时不在记忆页也能在返回后看到特效。
+    private val _dreamEvent = MutableSharedFlow<DreamReport>(replay = 1, extraBufferCapacity = 1)
+    private var dreamEffectAt = 0L
+    private var dreamEffectClaims = 0
     private val _dreamInProgress = MutableStateFlow(false)
     private val pendingDreamChange = AtomicReference<DreamReport?>(null)
 
@@ -179,6 +182,21 @@ class MemoryRepository(context: Context) {
 
     /** Dream 一次性事件（仅实际的 Dream 完成时发送，StateFlow 旧值不重放） */
     fun observeDreamEvent(): Flow<DreamReport> = _dreamEvent
+
+    /** 每轮 Dream 的完成特效最多展示两次，兼顾当场反馈与返回主页后的演示。 */
+    @Synchronized
+    fun claimDreamEffect(at: Long): Boolean {
+        if (at != dreamEffectAt) {
+            dreamEffectAt = at
+            dreamEffectClaims = 0
+        }
+        if (dreamEffectClaims >= 2) return false
+        dreamEffectClaims++
+        return true
+    }
+
+    /** Dream 是否正在执行（进度指示器用） */
+    fun observeDreamInProgress(): StateFlow<Boolean> = _dreamInProgress
 
     // ---------- AutoDream（阶段 4：记忆自进化） ----------
 

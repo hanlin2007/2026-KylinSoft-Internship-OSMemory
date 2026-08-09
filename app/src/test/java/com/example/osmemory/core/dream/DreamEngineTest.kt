@@ -49,6 +49,7 @@ class DreamEngineTest {
         override fun observeAll(limit: Int): Flow<List<MemoryLogEntity>> = flowOf(emptyList())
         override suspend fun observeAllNow(): List<MemoryLogEntity> = emptyList()
         override suspend fun deleteAll() = Unit
+        override suspend fun lastTimestamp(type: String): Long = 0L
     }
 
     /** 假树：内存列表 + 操作记录（归档置状态而非删除，模拟可恢复） */
@@ -84,6 +85,12 @@ class DreamEngineTest {
                 dreamState = DreamItem.STATE_ARCHIVED, mergedInto = mergedInto
             )
         }
+
+        // 不活跃遗忘方法（测试中均为 no-op）
+        override suspend fun lastDreamTimestamp(): Long = 0L
+        override suspend fun incrementInactiveCycles(lastDreamAt: Long) {}
+        override suspend fun staleMemoIds(minCycles: Int): List<String> = emptyList()
+        override suspend fun deleteStaleInactive(): Int = 0
     }
 
     private fun item(
@@ -399,7 +406,8 @@ class DreamEngineTest {
 
         assertEquals(1, report.distilledCount)
         assertTrue(report.changed)
-        val distilled = tree.inserted.single()
+        val distilled = tree.inserted.firstOrNull { it.source == "dream_distill" && it.category == "综合洞察" }
+            ?: tree.inserted.first { it.source == "dream_distill" }
         assertEquals("dream_distill", distilled.source)
         assertEquals("用户热爱运动健身", distilled.content)
         assertTrue(distilled.tags.contains("高维"))

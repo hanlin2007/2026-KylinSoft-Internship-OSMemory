@@ -94,6 +94,26 @@ class LocalTreeOps(
             )
         }
     }
+
+    // ---------- 不活跃遗忘（TreeOps 实现） ----------
+
+    override suspend fun lastDreamTimestamp(): Long {
+        return logDao?.lastTimestamp("DREAM") ?: 0L
+    }
+
+    override suspend fun incrementInactiveCycles(lastDreamAt: Long) {
+        itemDao.incrementInactiveCycles(lastDreamAt)
+    }
+
+    override suspend fun staleMemoIds(minCycles: Int): List<String> {
+        return itemDao.allItems()
+            .filter { it.dreamState == DreamItem.STATE_ACTIVE && it.inactiveDreamCycles >= minCycles }
+            .map { it.memoId }
+    }
+
+    override suspend fun deleteStaleInactive(): Int {
+        return itemDao.deleteStaleInactive()
+    }
 }
 
 /** 云端树 TreeOps：Dream 引擎读写云端树（云端算力，整合结果不脱离云端树） */
@@ -174,4 +194,10 @@ class CloudTreeOps(
             )
         }
     }
+
+    // 云端树不做不活跃遗忘（云端是演示缓存，遗忘只对本地树生效）
+    override suspend fun lastDreamTimestamp(): Long = 0L
+    override suspend fun incrementInactiveCycles(lastDreamAt: Long) {}
+    override suspend fun staleMemoIds(minCycles: Int): List<String> = emptyList()
+    override suspend fun deleteStaleInactive(): Int = 0
 }
