@@ -1,131 +1,78 @@
-# AI Native OS Memory | AI 操作系统原生记忆框架
+# OS Memory | AI 原生操作系统记忆框架
 
-OS Memory 是一个面向 Android 的 AI Native 记忆系统原型。它把应用产生的自然语言信息处理成可检索、可审计的“原子记忆”，并围绕记忆的新增、读取、修改、删除，提供本地树、云端树演示、语义检索、安全隔离以及三个配套应用。
+> OS Memory 是一个面向 Android 的 AI 原生记忆系统原型。随着操作系统从“AI 外挂”向“AI 原生”的演进，我们希望把“记忆”从单个 AI 应用内部的功能，提升为可以被多个应用共享、安全透明且由系统统一管理的用户态服务。
+>
+> 在这份 README 中，我会带你快速了解项目的设计理念、当前能力和后续方向。如果你关心内部模块、数据结构和调用链路，可以从[架构设计说明](docs/架构设计说明.md)开始；如果你想直接接入业务功能，也可以直接阅读[对外接口文档](docs/对外接口文档.md)和[在 Android Studio 中完整运行](#在-android-studio-中完整运行)。
 
-OS Memory 目前使用网关双路分离策略，在联网时使用 OpenAI 兼容的云端模型；离线时，控制台“向本地树新增记忆”这条演示链可使用 Android 设备内的 llama.cpp + Qwen2.5 0.5B GGUF 完成结构化抽取，不需要向云端模型发请求。
 
-> 本项目目前是研究与演示原型，不是 Android 系统级服务，也不是可直接用于生产环境的个人数据保险箱。请先阅读[当前边界](#当前能力与边界)和[安全注意事项](#安全注意事项)。
+## 项目简介
 
-## 目录
+现在很多应用都有自己的用户记忆功能（如购物平台，短视频推荐平台），单个AI ChatBot / Agent 的记忆能力也越来越强（如 Claude Code 和 Hermes Agent），而痛点却是它们仍然很难持续理解同一个用户的**跨应用记忆和画像**。用户的偏好散落在聊天记录里，项目上下文停留在某个应用内部，换一个入口之后，很多项目背景、工作上下文都需要重新解释。同时，在特殊政企、军工行业中，记忆的安全透明、可审查和可解释性也变得越来越敏感和关键。
 
-- [项目背景与阶段演进](#项目背景与阶段演进)
-- [当前可以做什么](#当前可以做什么)
-- [当前能力与边界](#当前能力与边界)
-- [架构概览](#架构概览)
-- [在 Android Studio 中完整运行](#在-android-studio-中完整运行)
-- [演示当前版本](#演示当前版本)
-- [测试与质量检查](#测试与质量检查)
-- [常见问题](#常见问题)
-- [安全注意事项](#安全注意事项)
-- [许可证与第三方组件](#许可证与第三方组件)
-- [延伸阅读](#延伸阅读)
+为此，我们开创性地将 AgentOS 与 Kylin AI OS 的思想关联，将 Claude Code、OpenClaw、Hermes、MemOS、CodeX 等 AI Agent 的记忆系统融入操作系统设计，实现了：
 
-## 项目背景与阶段演进
+- **记忆的进化生命周期循环**：从原始输入到原子记忆，再到整合、遗忘和冲突处理。
+- **跨应用记忆流动模型**：备忘录产生的记录可以进入系统记忆，ChatBot 可以在授权范围内检索它，文件分类器也可以基于记忆生成新的分类建议。
+- **特殊政企/军工场景的安全敏感策略**：规则门控与模型判断双重保障，敏感记忆不会流出本地安全区。
+- **图记忆库组织**：记忆以图结构关联，支持更丰富的上下文推理。
+- **本地 / 云端网关与记忆树隔离**：Local Tree 是离线可用的数据源，Cloud Tree 使用独立数据库模拟云端记忆树，保持 Local → Cloud 的单向同步边界。
+- **AutoDream 后台记忆整合**：在后台自动进行记忆的合并、去重、高维特征提取，让记忆库持续自我进化。
 
-OS Memory 是为了研究“AI 如何拥有持久、可审计、可隔离的记忆”而构建的 Android 原生原型。它不模拟完整的操作系统，而是聚焦记忆的**采集 → 结构化 → 检索 → 隔离 → 审计**闭环，并用三个小应用演示业务功能如何接入这套记忆能力。
+OS Memory 目前以系统应用形式运行在服务层，可直接接入 Android 系统应用、OpenClaw、飞书/QQ Bot 开放接口、文件和图片分类管理器等自研 AI 应用。项目采用 Kotlin 编写，使用网关双路分离策略：
 
-仓库用分支记录每个开发阶段的成果，GitHub 上的分支图可以完整看到整个演进过程：
+- **在线时**：使用 OpenAI 兼容的云端模型，提供强大的语义理解。
+- **离线时**：控制台“向本地树新增记忆”这条演示链路可使用 Android 设备内的 `llama.cpp` + Qwen2.5 0.5B GGUF 完成结构化抽取，无需云端请求。
 
-| 阶段 | 对应提交 / 分支 | 主要成果 |
-|---|---|---|
-| 阶段一：最小可运行系统 | `0548405`（`api-key-warning` 分支的父提交） | 记忆控制台雏形：本地树、模型结构化抽取、关键词检索、审计日志 |
-| 阶段二：联网修复与安全 | `phase2-fix` | 双插拔模型网关、云树保守同步策略、自动整合、断网锁定、安全敏感日志、HTML 审计导出 |
-| 阶段三：记忆生态应用 | `phase3-dev` | 同进程 `MemoryApiClient` 门面，备忘录 / ChatBot / 文件分类管理器三个应用 |
-| 阶段四：离线端侧与打磨（当前节点） | `phase4-dev` | llama.cpp + Qwen2.5 0.5B 离线推理、文档完善、发布准备 |
+项目设计中还预留了更长期的方向，包括记忆的插件化、原生 MCP、Hook、Skills 的转化，AI 应用生态的接入，可参考 [开发路线图](docs/开发路线图.md)，欢迎更多开源社区的贡献者参与到我们的工作中来，期待与你一起致力于打造更智能、更安全的 AI 操作系统记忆基础设施。
 
-阶段二、三的成果已经并入阶段四主线，因此**当前 `phase4-dev` 分支就是集成了全部工作的成功版本**。建议把该节点用 Git tag 固定下来（例如 `v0.4.0`），后续实验在 `main` 之外的新分支进行；即使后续开发失败，也能随时回到这个可运行版本。
+## 项目展示
 
-## 当前可以做什么
+![image-20260810152051272](./assets/image-20260810152051272.png)
 
-### OS Memory 控制台
+![image-20260810152015681](./assets/image-20260810152015681.png)
 
-- 在 Local Tree 中新增、查看、搜索、修改和删除记忆。
-- 将文本净化后执行安全门控、模型结构化抽取、24 小时同源去重，再保存为原子记忆卡片。
-- 使用关键词召回，并可让模型对候选结果进行语义重排。
-- 将普通记忆从本地树单向同步到 Cloud Tree；敏感或主动保密的记忆不会迁移。
-- 断网时锁定 Cloud Tree 面板，不把云端内容回拉到本地。
-- 根据本地记忆生成用户画像、风格偏好和工作项目信息。
-- 查看 `COLLECT`、`RETRIEVE`、`INFER`、`SECURITY` 四类审计日志。
-- 导出可由手机浏览器直接打开的自包含 HTML 审计快照。
-- 分别测试云端模型和端侧模型是否可用。
+## 系统架构
 
-### 三个记忆生态应用
+![image-20260810100703508](./assets/image-20260810100703508.png)
 
-安装同一个 APK 后，启动器中会出现 OS Memory 控制台以及三个独立入口：
+上图展示了 OS Memory 的系统层级架构和记忆流动设计，自底向上为：
 
-- **备忘录**：主页面是记录列表；新建或点击记录后进入文字编辑页。记录可关联到 OS Memory，后续修改和删除也可同步到对应记忆。
-- **ChatBot**：提供简单问答和“启用 OS Memory”开关。启用后读取本地普通记忆作为上下文，并将模型生成的项目/会话记忆逐条写回记忆系统。
-- **文件分类管理器**：提供“伪上传”交互，不读取真实文件；默认包含家庭、工作、生活、旅行四类，可根据本地记忆动态生成新类别。
+1. **数据存储层**
+   - **Local Tree**：基于 Room 的本地数据库，是离线状态下的唯一数据来源，存储所有原子记忆卡片及其图关系。
+   - **Cloud Tree**：第二个独立的 Room 数据库，用于模拟联网/内网环境下的云端记忆树，与 Local Tree 保持物理隔离。
+   - **审计日志存储**：记录 `COLLECT`、`RETRIEVE`、`INFER`、`SECURITY` 四类操作，便于事后追溯。
 
-### 在线与离线模型路由
+2. **记忆治理层**
+   - **输入净化**：去除噪声、标准化格式。
+   - **安全门控**：基于规则和模型判断敏感等级（`policyLevel=0` 普通，`policyLevel=2` 敏感）。
+   - **结构化抽取**：调用云端或端侧模型，将自然语言转换为结构化记忆卡片。
+   - **同源去重**：24 小时内相同来源的相似记忆自动合并。
+   - **图关联引擎**：为新记忆寻找已有节点，建立语义关系。
 
-- 系统检测到有效网络时，模型请求走云端 OpenAI 兼容接口。
-- 系统离线时，模型请求只走本机 llama.cpp，不尝试用云端 HTTP 兜底。
-- 端侧模型不打包进 APK。第一次点击“测试端侧模型”时下载固定版本 GGUF，并校验文件大小和 SHA-256。
-- 当前明确验收的端侧场景只有：**离线 → Local Tree → 新增记忆 → 端侧结构化抽取 → 本地入库**。
+3. **服务接口层**
+   - **MemoryApiClient**：同进程 Kotlin 客户端，提供增删改查、检索、同步、画像生成等 API。
+   - **模型路由**：根据网络状态动态选择云端或端侧模型，并支持手动配置。
+   - **权限与审计**：控制应用对记忆的读写权限，记录所有敏感操作。
 
-## 当前能力与边界
+4. **应用接入层**
+   - 控制台（OS Memory 主界面）：管理本地记忆、测试模型、查看审计日志。
+   - 示例应用：备忘录、ChatBot、文件分类管理器——展示记忆在不同场景下的流转。
+   - 未来可扩展为系统级服务，通过 Binder/AIDL 或 ContentProvider 对外暴露。
 
-| 项目 | 当前实现 |
-|---|---|
-| Android 形态 | 一个 APK、一个应用进程、四个 Launcher Activity |
-| 应用接入 | 同进程 Kotlin `MemoryApiClient` |
-| 跨应用调用 | 尚未实现 Binder/AIDL、ContentProvider 或 HTTP 服务 |
-| Local Tree | Room 本地数据库，是离线状态下的数据来源 |
-| Cloud Tree | 第二个独立 Room 数据库，用于模拟内网云树及隔离行为；不是远端云数据库 |
-| 同步方向 | Local Tree → Cloud Tree 单向同步；不会把云端树内容带回离线本地树 |
-| 敏感数据 | 规则门控与模型判断取并集；敏感记忆 `policyLevel=2`，普通应用不可读取且不会同步 |
-| 云端模型 | OpenAI Chat Completions 兼容接口，Base URL、Model ID、API Key 可配置 |
-| 端侧模型 | llama.cpp + Qwen2.5-0.5B-Instruct Q4_K_M，当前只构建 `x86_64` |
-| 文件上传 | 仅为界面伪接口，不申请文件权限、不扫描、不读取、不上传文件 |
-| ChatBot 记忆 | 已有项目/会话逐条记忆；全局长期聊天记忆尚未实现 |
-| 生产安全 | 数据库和 SharedPreferences 未做硬件级加密；不应存放真实高敏感生产数据 |
+**数据流向**：
 
-更完整的应用接入说明见[对外接口文档](docs/对外接口文档.md)。
+- **写入流程**：应用 → MemoryApiClient → 净化 → 安全门控 → 结构化抽取 → 去重 → 存入 Local Tree（同时触发 AutoDream 后台处理）。
+- **检索流程**：应用 → MemoryApiClient → 关键词召回 → 可选语义重排 → 返回结果（敏感记忆默认过滤）。
+- **同步流程**：Local Tree 中 `policyLevel=0` 且非保密标记的记忆，可手动或自动单向同步到 Cloud Tree；敏感记忆永不迁移。
+- **审计流程**：所有关键操作（收集、检索、推理、安全事件）写入审计日志，支持导出 HTML 快照。
 
-## 架构概览
+## OS Memory 接口说明
 
-```mermaid
-flowchart LR
-    subgraph Apps["同一 APK 中的应用入口"]
-        Console["OS Memory 控制台"]
-        Notes["备忘录"]
-        Chat["ChatBot"]
-        Files["文件分类管理器"]
-    end
+OS Memory 目前已经是一个完整的闭环项目，**架构原型验证和可行性系统**，为了更好演示系统功能和测试系统效果，我们完成了三个系统应用的小 demo。
 
-    Notes --> API["MemoryApiClient\n身份 + scope + DTO"]
-    Chat --> API
-    Files --> API
-    Console --> Repo["MemoryRepository"]
-    API --> Repo
-    Repo --> Pipeline["净化 → 安全门控 → 模型抽取 → 去重 → 审计"]
-    Pipeline --> Local["Local Tree\nRoom"]
-    Repo --> Retrieval["关键词召回 + 可选语义重排"]
-    Retrieval --> Local
-    Repo --> Router{"每次调用检查网络"}
-    Router -->|在线| CloudModel["OpenAI 兼容云端模型"]
-    Router -->|离线| LocalModel["llama.cpp + Qwen GGUF"]
-    Local -->|在线且允许同步| CloudTree["Cloud Tree\n独立 Room 演示库"]
-```
+对于跨进程身份校验、硬件级密钥保护、多用户隔离、远程云数据库和生产级同步协议等接入生产环境的敏感场景，目前系统支持个性化配置和完善安全策略。
 
-核心目录：
-
-```text
-app/src/main/java/com/example/osmemory/
-├── core/model/          # 云端模型、端侧模型、动态路由和模型配置
-├── core/pipeline/       # 记忆收集、净化、安全门控和结构化抽取
-├── core/retrieval/      # 关键词召回和语义重排
-├── data/                # Repository、Local/Cloud Room 数据库和审计导出
-├── phase3/api/          # 三个应用使用的 MemoryApiClient
-├── phase3/notes/        # 备忘录
-├── phase3/chat/         # ChatBot
-└── phase3/classifier/   # 文件分类管理器
-
-llama-runtime/           # Android/JNI 端侧推理封装
-third_party/llama.cpp/   # 固定 revision 的 Git submodule
-docs/                    # 设计、接口和阶段说明
-```
+更完整的应用接入说明见 [对外接口文档](docs/对外接口文档.md)。
 
 ## 在 Android Studio 中完整运行
 
@@ -142,17 +89,17 @@ docs/                    # 设计、接口和阶段说明
 
 本项目在构建脚本中固定了这些 Android 组件：
 
-| 组件 | 版本或要求 |
-|---|---|
-| Compile SDK | Android API 37 |
-| Min SDK | API 24 |
-| Target SDK | API 37 |
-| Gradle | Wrapper `9.5.0` |
-| Android Gradle Plugin | `9.3.1` |
-| Java | 17 |
-| NDK | `29.0.13113456` |
-| CMake | `3.31.6` |
-| 端侧运行 ABI | 仅 `x86_64` |
+| 组件                  | 版本或要求      |
+| --------------------- | --------------- |
+| Compile SDK           | Android API 37  |
+| Min SDK               | API 24          |
+| Target SDK            | API 37          |
+| Gradle                | Wrapper `9.5.0` |
+| Android Gradle Plugin | `9.3.1`         |
+| Java                  | 17              |
+| NDK                   | `29.0.13113456` |
+| CMake                 | `3.31.6`        |
+| 端侧运行 ABI          | 仅 `x86_64`     |
 
 在 Android Studio 中打开 **Tools → SDK Manager**：
 
@@ -302,134 +249,43 @@ adb install -r -t app/build/outputs/apk/debug/app-debug.apk
 
 当前固定模型信息：
 
-| 项目 | 值 |
-|---|---|
-| 模型 | Qwen2.5-0.5B-Instruct-GGUF Q4_K_M |
-| Revision | `9217f5db79a29953eb74d5343926648285ec7e67` |
-| 文件大小 | `491400032` bytes，约 468.6 MiB |
-| SHA-256 | `74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db` |
-| 保存位置 | 应用私有 `noBackupFilesDir/models/` |
+| 项目     | 值                                                           |
+| -------- | ------------------------------------------------------------ |
+| 模型     | Qwen2.5-0.5B-Instruct-GGUF Q4_K_M                            |
+| Revision | `9217f5db79a29953eb74d5343926648285ec7e67`                   |
+| 文件大小 | `491400032` bytes，约 468.6 MiB                              |
+| SHA-256  | `74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db` |
+| 保存位置 | 应用私有 `noBackupFilesDir/models/`                          |
 
-下载期间不要关闭应用或切断网络。卸载应用或清除应用数据后需要重新下载。端侧测试不需要云端 API Key，但下载模型本身需要访问 Hugging Face。
+下载期间不应关闭应用或切断网络。卸载应用或清除应用数据后需要重新下载。端侧测试不需要云端 API Key，但下载模型本身需要访问 Hugging Face。
 
-## 演示当前版本
+## 相关文档链接
 
-### 在线演示
 
-1. 在模型设置页填写自己的云端配置，并点击“测试云端模型”。
-2. 回到记忆库，在 Local Tree 点击右下角按钮新增一条普通记忆。
-3. 查看卡片中的标题、分类、标签和置信度，再到“调用日志”查看传入与模型抽取记录。
-4. 打开左侧菜单，点击“同步到云端”，然后切换到 Cloud Tree 查看允许迁移的记忆。
-5. 分别打开备忘录、ChatBot、文件分类管理器，验证关联记忆、带记忆问答和记忆生成类别。
-6. 导出审计 HTML，用手机浏览器查看本地树、云端树和日志快照。
-
-### 离线端侧模型演示
-
-必须先按上一节完成端侧模型下载与测试。
-
-1. 在模拟器的快捷设置中关闭网络或开启飞行模式。
-2. 回到 OS Memory，确认侧栏显示“离线”，Cloud Tree 被锁定。
-3. 留在 Local Tree，点击右下角按钮新增一条记忆。
-4. 等待端侧 Qwen 完成抽取。模拟器只使用 CPU，耗时明显长于普通 UI 操作属于正常现象。
-5. 确认记忆正常入库，并在调用日志中看到端侧模型通道，而不是云端 HTTP 请求。
-
-本轮没有把备忘录、ChatBot、文件分类管理器的完整离线推理作为验收范围。端侧模型缺失或损坏时，系统不会尝试云端请求；记忆流水线会保留原有的显式降级入库和错误日志，以免无提示丢失用户输入。
-
-## 测试与质量检查
-
-提交代码前建议依次运行：
-
-```bash
-./gradlew :app:testDebugUnitTest
-./gradlew :app:lintDebug
-./gradlew :app:assembleDebug
-```
-
-Windows 将 `./gradlew` 替换为 `.\gradlew.bat`。单元测试不调用真实公网模型；端侧 JNI 与实际 GGUF 推理需要在支持的模拟器上手工验证。
-
-如果要检查当前 Git 状态是否误包含密钥或模型：
-
-```bash
-git status --short
-git check-ignore -v local.properties
-git ls-files '*.gguf' '*.ggml' local.properties
-```
-
-最后一条命令正常情况下没有输出。
-
-## 常见问题
-
-### CMake 提示找不到 llama.cpp 源码
-
-子模块没有初始化。回到仓库根目录执行：
-
-```bash
-git submodule update --init --recursive
-```
-
-### 找不到 NDK 29 或 CMake 3.31.6
-
-在 SDK Manager 的 SDK Tools 页打开 **Show Package Details**，安装构建脚本指定的精确版本，然后重新 Sync Project with Gradle Files。
-
-### `Current ABI is not supported` 或 native 库无法加载
-
-当前只支持 `x86_64`。检查 AVD 的 ABI，不要选择 ARM64 镜像。真机 ARM64 支持属于后续工作。
-
-### 端侧模型下载失败或一直未就绪
-
-- 确认模拟器能访问 Hugging Face，并至少有约 1 GB 可用空间。
-- 保持应用在前台，重新点击“测试端侧模型”。
-- 校验失败时应用会拒绝使用文件，避免加载不完整或版本不一致的 GGUF。
-- 企业网络若屏蔽 Hugging Face，需要由网络管理员放行当前固定下载地址；不要随意替换未知模型文件。
-
-### 云端测试返回 401、403 或 404
-
-- `401/403`：检查 API Key、账户权限和模型授权。
-- `404`：检查 Base URL 是否为服务商要求的 OpenAI 兼容根路径，通常需要包含 `/v1`；再确认 Model ID 拼写。
-- 修改 `local.properties` 后设备仍使用旧 Key：这是“不覆盖用户设置”的预期行为，请在应用模型设置页修改，或清除应用数据。
-
-### 离线新增记忆显示降级
-
-先联网打开模型设置并完成“测试端侧模型”。如果模型未下载、文件校验失败、ABI 不支持或设备内存不足，流水线会明确记录原因并降级保存，不会偷偷调用云端。
-
-### Windows 命令行 Gradle 出现 loopback / AF_UNIX 错误
-
-Android Studio 内构建通常不受影响。PowerShell 可先设置：
-
-```powershell
-$env:JDK_JAVA_OPTIONS='-Djdk.net.unixdomain.tmpdir=C:/Windows/Temp'
-```
-
-如果使用 `cmd.exe`，改用：
-
-```bat
-set JDK_JAVA_OPTIONS=-Djdk.net.unixdomain.tmpdir=C:/Windows/Temp
-```
-
-然后在同一个终端中重新运行 Gradle Wrapper。
-
-## 安全注意事项
-
-- 不要提交 API Key、签名 keystore、`.env`、`local.properties` 或 GGUF 权重。仓库已提供相应 `.gitignore`，但提交前仍应检查 staged diff。
-- 如果密钥曾经进入任何 commit，仅从最新文件中删除是不够的；Git 历史仍可能包含它。应立即在服务商后台吊销/轮换，并在必要时清理历史后强制推送。
-- Debug APK 中的 `BuildConfig` 不是秘密保险箱。不要将带真实 Key 的 APK 上传到 GitHub Release、网盘或公开群组。
-- 当前 API Key 保存于普通 SharedPreferences，本地数据库也没有 SQLCipher 等静态加密；本项目只适合演示数据。
-- Cloud Tree 当前是设备上的隔离模拟库，不能把它当作已经具备远端鉴权、传输加密、租户隔离和容灾能力的生产云服务。
-- 模型输出是不可信输入。当前实现做了 JSON 清洗、安全规则兜底和审计，但仍应避免让模型结果直接触发不可逆外部操作。
+| 文档                                                       | 适合谁读                      | 主要内容                                                 |
+| ---------------------------------------------------------- | ----------------------------- | -------------------------------------------------------- |
+| [文档中心](docs/README.md)           | 所有读者                      | docs 的统一入口与阅读顺序                                |
+| [架构设计说明](docs/架构设计说明.md) | 想理解系统设计的开发者        | 分层架构、记忆流水线、Local / Cloud Tree、模型路由与审计 |
+| [对外接口文档](docs/对外接口文档.md) | 准备接入业务的 Android 开发者 | `MemoryApiClient`、权限、DTO、错误与接入示例             |
+| [端侧模型说明](docs/端侧模型说明.md) | 关注离线推理的开发者          | llama.cpp、Qwen GGUF、ABI、模型校验与离线验收链路        |
+| [开发路线图](docs/开发路线图.md)     | 想了解项目后续方向的贡献者    | 当前已完成能力、仍在规划中的系统化演进方向               |
 
 ## 许可证与第三方组件
 
-当前仓库根目录尚未提供项目自身的 `LICENSE` 文件，因此除第三方组件各自许可的范围外，不应默认认为本项目代码已经以某种开源许可证授权。仓库所有者准备公开协作或允许复用前，应补充明确的项目许可证。
+当前仓库**尚未最终确定 `LICENSE` 文件**。因此，在后续团队补充明确的开源许可证之前，请不要把 OS Memory 项目代码默认视为已经获得 MIT、Apache-2.0 或其他开源许可证授权。
 
-第三方组件信息见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)：
+第三方组件仍遵循它们各自的许可证，详情以仓库中的 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) 为准。当前主要包括：
 
-- llama.cpp：MIT License，以 Git submodule 固定 revision 引入。
-- Qwen2.5-0.5B-Instruct-GGUF：Apache-2.0；由用户运行时下载，不存放在本仓库或 APK 中。
+- **llama.cpp**：MIT License，以 Git submodule 固定 revision 引入。
+- **Qwen2.5-0.5B-Instruct-GGUF**：Apache-2.0；模型由用户在运行时下载，不存放在本仓库或 APK 中。
 
-## 延伸阅读
+项目自身未来选择的许可证不会替代第三方组件原有的许可与声明要求。
 
-- [当前对外接口文档](docs/对外接口文档.md)
-- [阶段四端侧小模型说明](docs/阶段4端侧小模型说明.md)
-- [阶段三系统 API 与三个应用说明](docs/阶段3系统API与三应用说明.md)
-- [架构设计说明](docs/架构设计说明.md)
-- [开发计划](docs/OSMemory开发计划.md)
+## 交流与贡献
+
+OS Memory 目前仍处于原型快速演进阶段，欢迎围绕记忆系统设计、Android 系统服务、端侧模型、隐私安全和跨应用 AI 体验提交问题、建议与代码贡献。
+
+- 提交 Issue：如果你在运行系统时遇到任何 Bug、环境问题、架构建议和功能讨论都可以通过 GitHub Issues 发起；请尽量附上设备 / 模拟器信息、Android API、复现步骤和相关日志。
+- 提交 Pull Request：如果你有改进建议、新功能或者修复，欢迎发起 Pull Request。尽量聚焦单一问题，并说明改动背景、实现方式、验证结果，以及是否影响数据库、模型路由、权限边界或现有 API。
+- 文档更新：如果代码改动改变了接口、运行方式、模型版本或系统边界，请同时更新 README 或 `docs/` 中对应文档。
+- 如果你觉得本项目对你有有帮助或参考价值，不妨点个 ⭐ 收藏
